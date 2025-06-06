@@ -20,9 +20,10 @@ function formatDuration(seconds: number) {
 export function Dashboard() {
   const navigate = useNavigate();
   const [videos, setVideos] = useState<VideoItem[]>([]);
+  const API_BASE = 'http://localhost:3301';
 
   useEffect(() => {
-    fetch('/api/videos')
+    fetch(`${API_BASE}/api/videos`)
       .then(res => res.json())
       .then(setVideos)
       .catch(err => console.error('Fehler beim Laden der Videos', err));

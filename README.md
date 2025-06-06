@@ -15,9 +15,9 @@ Dieses Repository enthält das Frontend-Design im Ordner `src` und ein einfaches
 
 Die Oberfläche kann mit einem beliebigen statischen Webserver aufgerufen werden, z.B. mit `npx serve`:
 ```bash
-npx serve -s .
+npx serve -s . -l 3300
 ```
-Anschließend `http://localhost:3000` (Standardport von `serve`) im Browser öffnen.
+Anschließend `http://localhost:3300` im Browser öffnen.
 
 
 ## Backend starten
@@ -31,5 +31,6 @@ Anschließend `http://localhost:3000` (Standardport von `serve`) im Browser öff
    ```bash
    node index.js
    ```
+   Der Backend-Server läuft standardmäßig auf Port **3301**.
 
 Der Server speichert hochgeladene Videos sowie via URL importierte Inhalte in `server/uploads` und generiert Vorschaubilder in `server/thumbnails`. Die Metadaten werden in einer SQLite-Datenbank `videos.db` verwaltet.

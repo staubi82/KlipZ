@@ -15,6 +15,8 @@ export function Upload() {
   const [isPublic, setIsPublic] = useState(true);
   const [category, setCategory] = useState('');
 
+  const API_BASE = 'http://localhost:3301';
+
   const categories = [
     'Gaming',
     'Musik',
@@ -65,7 +67,7 @@ export function Upload() {
       formData.append('video', selectedFile);
       formData.append('title', title);
       formData.append('description', description);
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Upload fehlgeschlagen');
       setSelectedFile(null);
       setPreviewUrl(null);
@@ -87,7 +89,7 @@ export function Upload() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await fetch('/api/upload', {
+      const response = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, title, description })

@@ -15,9 +15,11 @@ import {
 
 function formatDuration(seconds: number) {
   const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
+const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
+
+const API_BASE = 'http://localhost:3301';
 export function VideoPlayer() {
   const { id } = useParams();
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -29,7 +31,7 @@ export function VideoPlayer() {
   const [recommendedVideos, setRecommended] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/videos')
+    fetch(`${API_BASE}/api/videos`)
       .then(res => res.json())
       .then((all) => {
         const current = all.find((v: any) => v.id === videoId);
@@ -44,7 +46,7 @@ export function VideoPlayer() {
     controls: true,
     responsive: true,
     fluid: true,
-    sources: video ? [{ src: `/api/videos/${video.id}`, type: 'video/mp4' }] : []
+    sources: video ? [{ src: `${API_BASE}/api/videos/${video.id}`, type: 'video/mp4' }] : []
   };
 
   const handlePlayerReady = (player: any) => {

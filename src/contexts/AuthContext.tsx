@@ -1,5 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 
+const API_BASE = 'http://localhost:3301';
+
 interface User {
   _id: string;
   username: string;
@@ -52,7 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
