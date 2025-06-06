@@ -1,6 +1,6 @@
 # Klipzz
 
-Dieses Repository enthält das Frontend-Design im Ordner `src` und ein einfaches Node.js-Backend im Ordner `server`.
+Dieses Repository enthält das Frontend-Design im Ordner `src` und ein Node.js-Backend im Ordner `server`.
 
 ## Installation
 
@@ -10,14 +10,23 @@ Dieses Repository enthält das Frontend-Design im Ordner `src` und ein einfaches
    cd Klipzz
    ```
 2. Abhängigkeiten installieren. Node.js sowie `ffmpeg` und `yt-dlp` müssen auf dem System vorhanden sein.
+   ```bash
+   npm install
+   ```
 
 ## Frontend starten
 
-Die Oberfläche kann mit einem beliebigen statischen Webserver aufgerufen werden, z.B. mit `npx serve`:
+Im Entwicklungsmodus startet ihr die Oberfläche mit Vite:
 ```bash
-npx serve -s . -l 3300
+npm run dev
 ```
-Anschließend `http://localhost:3300` im Browser öffnen.
+Nach dem Build kann das fertige Frontend aus dem Ordner `dist` statisch
+serviert werden, z.B. so:
+```bash
+npm run build
+npx serve -s dist -l 3300
+```
+Danach `http://localhost:3300` im Browser öffnen.
 
 
 ## Backend starten
