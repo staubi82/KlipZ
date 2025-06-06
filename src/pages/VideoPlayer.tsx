@@ -13,6 +13,11 @@ import {
   WhatsappIcon
 } from 'react-share';
 
+function formatDuration(seconds: number) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 export function VideoPlayer() {
   const { id } = useParams();
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -20,92 +25,26 @@ export function VideoPlayer() {
   const { toggleLike, toggleDislike, toggleFavorite, isLiked, isDisliked, isFavorite } = useVideoStore();
   const videoId = parseInt(id || '0');
 
-  const video = {
-    title: "Cyberpunk 2077 Gameplay Walkthrough",
-    description: "Ein ausführlicher Walkthrough durch Night City mit allen wichtigen Spots und versteckten Geheimnissen.",
-    views: 12500,
-    likes: 1200,
-    uploadDate: "2024-02-10",
-    creator: "CyberGamer",
-    preview: "https://cdn.plyr.io/static/demo/View_From_A_Blue_Moon_Trailer-576p.mp4"
-  };
+  const [video, setVideo] = useState<any>(null);
+  const [recommendedVideos, setRecommended] = useState<any[]>([]);
 
-  const recommendedVideos = [
-    {
-      id: "1",
-      title: "Night City Underground Tour",
-      thumbnail: "https://images.pexels.com/photos/3052361/pexels-photo-3052361.jpeg",
-      views: "8.5K",
-      creator: "CyberExplorer",
-      duration: "15:30"
-    },
-    {
-      id: "2",
-      title: "Cyberpunk Hacking Guide",
-      thumbnail: "https://images.pexels.com/photos/2599244/pexels-photo-2599244.jpeg",
-      views: "12K",
-      creator: "NetRunner",
-      duration: "22:15"
-    },
-    {
-      id: "3",
-      title: "Best Weapons in Night City",
-      thumbnail: "https://images.pexels.com/photos/595804/pexels-photo-595804.jpeg",
-      views: "15K",
-      creator: "WeaponMaster",
-      duration: "18:45"
-    },
-    {
-      id: "4",
-      title: "Secret Locations Guide",
-      thumbnail: "https://images.pexels.com/photos/1634278/pexels-photo-1634278.jpeg",
-      views: "10K",
-      creator: "NightCityHunter",
-      duration: "20:00"
-    },
-    {
-      id: "5",
-      title: "Stealth Gameplay Tips",
-      thumbnail: "https://images.pexels.com/photos/2510067/pexels-photo-2510067.jpeg",
-      views: "7.8K",
-      creator: "ShadowRunner",
-      duration: "12:30"
-    },
-    {
-      id: "6",
-      title: "Character Build Guide",
-      thumbnail: "https://images.pexels.com/photos/1722183/pexels-photo-1722183.jpeg",
-      views: "11K",
-      creator: "RPGMaster",
-      duration: "25:15"
-    },
-    {
-      id: "7",
-      title: "Vehicle Customization",
-      thumbnail: "https://images.pexels.com/photos/3802510/pexels-photo-3802510.jpeg",
-      views: "9.2K",
-      creator: "StreetRacer",
-      duration: "16:45"
-    },
-    {
-      id: "8",
-      title: "Combat System Tutorial",
-      thumbnail: "https://images.pexels.com/photos/4348404/pexels-photo-4348404.jpeg",
-      views: "13.5K",
-      creator: "CombatPro",
-      duration: "19:20"
-    }
-  ];
+  useEffect(() => {
+    fetch('/api/videos')
+      .then(res => res.json())
+      .then((all) => {
+        const current = all.find((v: any) => v.id === videoId);
+        setVideo(current);
+        setRecommended(all.filter((v: any) => v.id !== videoId));
+      })
+      .catch(err => console.error('Fehler beim Laden', err));
+  }, [videoId]);
 
   const videoJsOptions = {
     autoplay: false,
     controls: true,
     responsive: true,
     fluid: true,
-    sources: [{
-      src: video.preview,
-      type: 'video/mp4'
-    }]
+    sources: video ? [{ src: `/api/videos/${video.id}`, type: 'video/mp4' }] : []
   };
 
   const handlePlayerReady = (player: any) => {
@@ -127,48 +66,11 @@ export function VideoPlayer() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-cyber-text-light dark:text-white">
-              {video.title}
+              {video?.title}
             </h1>
-            <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
-              {video.views.toLocaleString()} Views • {video.uploadDate}
-            </p>
           </div>
           
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => toggleLike(videoId)}
-              className={`p-3 rounded-xl flex items-center space-x-2 transition-all ${
-                isLiked(videoId)
-                  ? 'bg-cyber-primary text-white'
-                  : 'bg-cyber-primary/10 text-cyber-text-light dark:text-white hover:bg-cyber-primary/20'
-              }`}
-            >
-              <ThumbsUp className="w-5 h-5" />
-              <span>{video.likes}</span>
-            </button>
-            
-            <button
-              onClick={() => toggleDislike(videoId)}
-              className={`p-3 rounded-xl transition-all ${
-                isDisliked(videoId)
-                  ? 'bg-cyber-primary text-white'
-                  : 'bg-cyber-primary/10 text-cyber-text-light dark:text-white hover:bg-cyber-primary/20'
-              }`}
-            >
-              <ThumbsDown className="w-5 h-5" />
-            </button>
-            
-            <button
-              onClick={() => toggleFavorite(videoId)}
-              className={`p-3 rounded-xl transition-all ${
-                isFavorite(videoId)
-                  ? 'bg-cyber-primary text-white'
-                  : 'bg-cyber-primary/10 text-cyber-text-light dark:text-white hover:bg-cyber-primary/20'
-              }`}
-            >
-              <Star className="w-5 h-5" />
-            </button>
-
             <div className="relative">
               <button
                 onClick={() => setIsShareOpen(!isShareOpen)}
@@ -205,31 +107,23 @@ export function VideoPlayer() {
               )}
             </div>
 
-            <a
-              href={video.preview}
-              download
-              className="p-3 rounded-xl bg-cyber-primary/10 text-cyber-text-light dark:text-white hover:bg-cyber-primary/20 transition-all"
-            >
-              <Download className="w-5 h-5" />
-            </a>
+            {video && (
+              <a
+                href={`/api/videos/${video.id}`}
+                download
+                className="p-3 rounded-xl bg-cyber-primary/10 text-cyber-text-light dark:text-white hover:bg-cyber-primary/20 transition-all"
+              >
+                <Download className="w-5 h-5" />
+              </a>
+            )}
           </div>
         </div>
 
-        <div className="flex items-start space-x-4">
-          <div className="w-12 h-12 rounded-full bg-cyber-primary/10 flex items-center justify-center">
-            <span className="text-xl font-bold text-cyber-primary">
-              {video.creator[0]}
-            </span>
+        {video && (
+          <div className="text-cyber-text-light dark:text-white whitespace-pre-line">
+            {video.description}
           </div>
-          <div>
-            <h3 className="font-semibold text-cyber-text-light dark:text-white">
-              {video.creator}
-            </h3>
-            <p className="text-cyber-text-light/60 dark:text-white/60 mt-2 whitespace-pre-line">
-              {video.description}
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="border-t border-cyber-primary/20 pt-8">
           <h3 className="text-xl font-bold text-cyber-text-light dark:text-white mb-6">
@@ -252,12 +146,9 @@ export function VideoPlayer() {
                     <h4 className="text-sm font-semibold text-white truncate">
                       {video.title}
                     </h4>
-                    <p className="text-xs text-white/80 mt-1">
-                      {video.creator} • {video.views} Views
-                    </p>
                   </div>
                   <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-                    {video.duration}
+                    {formatDuration(video.duration)}
                   </div>
                 </div>
               </Link>

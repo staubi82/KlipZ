@@ -19,6 +19,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS videos(
   description TEXT,
   filepath TEXT,
   thumbnail TEXT,
+  duration REAL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )`);
 
@@ -50,9 +51,10 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
     }
 
     const thumbPath = await generateThumbnail(filePath, thumbDir);
+    const duration = await getDuration(filePath);
 
-    const stmt = db.prepare('INSERT INTO videos(title, description, filepath, thumbnail) VALUES (?,?,?,?)');
-    const info = stmt.run(title || '', description || '', filePath, thumbPath);
+    const stmt = db.prepare('INSERT INTO videos(title, description, filepath, thumbnail, duration) VALUES (?,?,?,?,?)');
+    const info = stmt.run(title || '', description || '', filePath, thumbPath, duration);
 
     res.json({ id: info.lastInsertRowid });
   } catch (err) {
@@ -62,7 +64,7 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
 });
 
 app.get('/api/videos', (req, res) => {
-  const rows = db.prepare('SELECT id, title, description, thumbnail FROM videos ORDER BY created_at DESC').all();
+  const rows = db.prepare('SELECT id, title, description, thumbnail, duration, created_at FROM videos ORDER BY created_at DESC').all();
   res.json(rows);
 });
 
@@ -102,6 +104,15 @@ const generateThumbnail = (file, dir) => {
       .on('end', () => resolve(thumbPath))
       .on('error', reject)
       .screenshots({ count: 1, folder: dir, filename: path.basename(thumbPath) });
+  });
+};
+
+const getDuration = (file) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(file, (err, metadata) => {
+      if (err) return reject(err);
+      resolve(metadata.format.duration);
+    });
   });
 };
 

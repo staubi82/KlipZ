@@ -57,6 +57,28 @@ export function Upload() {
     }
   };
 
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('video', selectedFile);
+      formData.append('title', title);
+      formData.append('description', description);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Upload fehlgeschlagen');
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      setTitle('');
+      setDescription('');
+      setTags([]);
+    } catch (err) {
+      console.error('Fehler beim Upload:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const removeTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
@@ -65,27 +87,19 @@ export function Upload() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // Simuliere API-Aufruf für Video-Metadaten
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Simuliere Metadaten von YouTube
-      setTitle('Cyberpunk 2077 Gameplay Walkthrough');
-      setDescription('Ein ausführlicher Walkthrough durch Night City mit allen wichtigen Spots und versteckten Geheimnissen. Perfect für Neueinsteiger und Veteranen!');
-      setTags(['cyberpunk', 'gaming', 'walkthrough', 'nightcity']);
-      setCategory('Gaming');
-      setUrlPreview('https://images.pexels.com/photos/2014773/pexels-photo-2014773.jpeg');
-      
-      // Simuliere Upload-Fortschritt
-      setUploadProgress(0);
-      const interval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return prev + 10;
-        });
-      }, 500);
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, title, description })
+      });
+      if (!response.ok) {
+        throw new Error('Fehler beim Upload');
+      }
+      setUrl('');
+      setTitle('');
+      setDescription('');
+      setTags([]);
+      setUrlPreview(null);
     } catch (error) {
       console.error('Fehler beim Laden der Video-Metadaten:', error);
     } finally {
@@ -356,7 +370,8 @@ export function Upload() {
                 <button
                   type="button"
                   className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2"
-                > 
+                  onClick={handleUpload}
+                >
                   <UploadIcon className="w-5 h-5" />
                   <span>Video hochladen</span>
                 </button>
