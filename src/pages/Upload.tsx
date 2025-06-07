@@ -6,16 +6,34 @@ import { VideoJS } from '../components/VideoJS'; // Import VideoJS component
 export function Upload() {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Single file upload states
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // Batch upload states
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadMode, setUploadMode] = useState<'single' | 'batch'>('single');
+  const [batchProgress, setBatchProgress] = useState<{[key: string]: number}>({});
+  const [batchStatus, setBatchStatus] = useState<{[key: string]: 'pending' | 'uploading' | 'completed' | 'error'}>({});
+  
+  // Common metadata states
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [category, setCategory] = useState('');
-  const [isFormatSupportedForPreview, setIsFormatSupportedForPreview] = useState(true); // New state
-  const [transcode, setTranscode] = useState(false); // New state for transcode option
+  const [isFormatSupportedForPreview, setIsFormatSupportedForPreview] = useState(true);
+  const [transcode, setTranscode] = useState(false);
+  
+  // Batch-specific metadata
+  const [batchMetadata, setBatchMetadata] = useState({
+    category: '',
+    tags: '',
+    description: '',
+    transcode: false
+  });
 
   // State for URL import
   const [fetchedMetadata, setFetchedMetadata] = useState<any>(null);
@@ -29,12 +47,15 @@ export function Upload() {
   const API_BASE = 'http://localhost:3301';
 
   const [userCategories, setUserCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
 
   // Load user categories on component mount
   useEffect(() => {
+    // Load categories
     fetch(`${API_BASE}/api/categories`)
       .then(res => res.json())
       .then(data => {
+        setCategories(data);
         // Extract category names from API response objects
         const categoryNames = data.map((cat: any) => cat.name);
         setUserCategories(categoryNames);
@@ -43,25 +64,85 @@ export function Upload() {
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+    const files = e.target.files;
+    if (!files) return;
 
-      // Überprüfen Sie, ob der Browser das Videoformat abspielen kann
-      const videoElement = document.createElement('video');
-      const canPlay = videoElement.canPlayType(file.type);
+    if (uploadMode === 'single') {
+      const file = files[0];
+      if (file) {
+        setSelectedFile(file);
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
 
-      if (canPlay === '') {
-        console.warn(`Browser kann Dateiformat nicht abspielen: ${file.type}`);
-        setIsFormatSupportedForPreview(false);
-      } else {
-        console.log(`Browser kann Dateiformat abspielen: ${file.type} (${canPlay})`);
-        setIsFormatSupportedForPreview(true);
+        // Überprüfen Sie, ob der Browser das Videoformat abspielen kann
+        const videoElement = document.createElement('video');
+        const canPlay = videoElement.canPlayType(file.type);
+
+        if (canPlay === '') {
+          console.warn(`Browser kann Dateiformat nicht abspielen: ${file.type}`);
+          setIsFormatSupportedForPreview(false);
+        } else {
+          console.log(`Browser kann Dateiformat abspielen: ${file.type} (${canPlay})`);
+          setIsFormatSupportedForPreview(true);
+        }
       }
+    } else {
+      // Batch mode - handle multiple files
+      const fileArray = Array.from(files);
+      setSelectedFiles(fileArray);
+      
+      // Initialize progress and status for each file
+      const initialProgress: {[key: string]: number} = {};
+      const initialStatus: {[key: string]: 'pending' | 'uploading' | 'completed' | 'error'} = {};
+      
+      fileArray.forEach(file => {
+        const fileId = `${file.name}-${file.size}-${file.lastModified}`;
+        initialProgress[fileId] = 0;
+        initialStatus[fileId] = 'pending';
+      });
+      
+      setBatchProgress(initialProgress);
+      setBatchStatus(initialStatus);
     }
   };
+
+  const handleBatchFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const fileArray = Array.from(files);
+    setSelectedFiles(prev => [...prev, ...fileArray]);
+    
+    // Initialize progress and status for new files
+    const newProgress = { ...batchProgress };
+    const newStatus = { ...batchStatus };
+    
+    fileArray.forEach(file => {
+      const fileId = `${file.name}-${file.size}-${file.lastModified}`;
+      newProgress[fileId] = 0;
+      newStatus[fileId] = 'pending';
+    });
+    
+    setBatchProgress(newProgress);
+    setBatchStatus(newStatus);
+  };
+
+  const removeFileFromBatch = (fileToRemove: File) => {
+    const fileId = `${fileToRemove.name}-${fileToRemove.size}-${fileToRemove.lastModified}`;
+    setSelectedFiles(prev => prev.filter(file =>
+      `${file.name}-${file.size}-${file.lastModified}` !== fileId
+    ));
+    
+    // Remove from progress and status tracking
+    const newProgress = { ...batchProgress };
+    const newStatus = { ...batchStatus };
+    delete newProgress[fileId];
+    delete newStatus[fileId];
+    setBatchProgress(newProgress);
+    setBatchStatus(newStatus);
+  };
+
+  const getFileId = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
   const handleTagAdd = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && currentTag.trim()) {
@@ -119,6 +200,77 @@ export function Upload() {
   const removeTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
+
+  // Reset batch upload function
+  const resetBatchUpload = () => {
+    setSelectedFiles([]);
+    setBatchProgress({});
+    setBatchStatus({});
+    setBatchMetadata({
+      category: '',
+      tags: '',
+      description: '',
+      transcode: false
+    });
+  };
+
+  // Batch upload function
+  const handleBatchUpload = async () => {
+    if (selectedFiles.length === 0) return;
+
+    setIsLoading(true);
+
+    // Process files sequentially to avoid overwhelming the server
+    for (const file of selectedFiles) {
+      const fileId = getFileId(file);
+      
+      try {
+        // Update status to uploading
+        setBatchStatus(prev => ({ ...prev, [fileId]: 'uploading' }));
+
+        const formData = new FormData();
+        formData.append('video', file);
+        
+        // Use batch metadata or generate from filename
+        const fileTitle = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+        formData.append('title', fileTitle);
+        formData.append('description', batchMetadata.description);
+        formData.append('transcode', batchMetadata.transcode.toString());
+        formData.append('category', batchMetadata.category || 'alle');
+        
+        // Parse tags from comma-separated string
+        const tagsArray = batchMetadata.tags ? batchMetadata.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
+        formData.append('tags', JSON.stringify(tagsArray));
+        formData.append('isPublic', 'true'); // Default to public for batch uploads
+
+        const res = await fetch(`${API_BASE}/api/upload`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) throw new Error('Upload fehlgeschlagen');
+        
+        // Update status to completed
+        setBatchStatus(prev => ({ ...prev, [fileId]: 'completed' }));
+        setBatchProgress(prev => ({ ...prev, [fileId]: 100 }));
+
+      } catch (err) {
+        console.error(`Fehler beim Upload von ${file.name}:`, err);
+        setBatchStatus(prev => ({ ...prev, [fileId]: 'error' }));
+      }
+    }
+
+    setIsLoading(false);
+    
+    // Show completion message
+    const completedCount = Object.values(batchStatus).filter(status => status === 'completed').length;
+    const errorCount = Object.values(batchStatus).filter(status => status === 'error').length;
+    
+    if (completedCount > 0) {
+      alert(`Batch-Upload abgeschlossen!\n✅ ${completedCount} Videos erfolgreich hochgeladen${errorCount > 0 ? `\n❌ ${errorCount} Videos fehlgeschlagen` : ''}`);
+    }
+  };
+
 
   // Function to fetch metadata from URL
   const handleFetchMetadata = async (e: React.FormEvent) => {
@@ -239,6 +391,10 @@ export function Upload() {
     setImportId(null); // Reset import states
     setImportProgress(0);
     setImportStatus(null);
+    
+    // Reset batch upload states
+    resetBatchUpload();
+    setUploadMode('single');
   };
 
 
@@ -378,90 +534,303 @@ export function Upload() {
           Neues Video 🎬
         </h1>
         <div className="mt-2 text-cyber-text-light/60 dark:text-white/60">
-          Wähle eine der beiden Optionen, um dein Video hochzuladen
+          Wähle eine der Optionen, um dein Video hochzuladen
         </div>
+      </div>
+
+      {/* Upload Mode Tabs */}
+      <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+        <button
+          onClick={() => setUploadMode('single')}
+          className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all ${
+            uploadMode === 'single'
+              ? 'bg-cyber-primary text-white shadow-lg'
+              : 'text-cyber-text-light/60 dark:text-white/60 hover:text-cyber-primary'
+          }`}
+        >
+          Einzelnes Video
+        </button>
+        <button
+          onClick={() => setUploadMode('batch')}
+          className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all ${
+            uploadMode === 'batch'
+              ? 'bg-cyber-primary text-white shadow-lg'
+              : 'text-cyber-text-light/60 dark:text-white/60 hover:text-cyber-primary'
+          }`}
+        >
+          Batch Upload
+        </button>
       </div>
       
       <div className="space-y-6">
-        {/* URL Import Section */}
-        {!showMetadataForm && !selectedFile && (
-          <div className="rounded-2xl border border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
-                  <LinkIcon className="w-8 h-8 text-cyber-primary" />
+        {uploadMode === 'single' && (
+          <>
+            {/* URL Import Section */}
+            {!showMetadataForm && !selectedFile && (
+              <div className="rounded-2xl border border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
+                      <LinkIcon className="w-8 h-8 text-cyber-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-cyber-text-light dark:text-white">URL Import</h3>
+                      <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
+                        YouTube oder andere Plattformen
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-cyber-text-light dark:text-white">URL Import</h3>
-                  <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
-                    YouTube oder andere Plattformen
-                  </p>
+
+                <form onSubmit={handleFetchMetadata} className="flex-1 flex flex-col">
+                  <div className="space-y-4">
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white placeholder-cyber-text-light/50 dark:placeholder-white/50 focus:outline-none focus:border-cyber-primary transition-all"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isLoading || !url}
+                      className="w-full mt-6 flex items-center justify-center space-x-2 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <LinkIcon className="w-5 h-5" />
+                      )}
+                      <span>{isLoading ? 'Wird geladen...' : 'Metadaten abrufen'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+            
+            {/* Separator */}
+            {!showMetadataForm && !selectedFile && (
+              <div className="relative">
+                <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 bg-white dark:bg-gray-800">
+                  <span className="text-cyber-text-light/40 dark:text-white/40">oder</span>
                 </div>
+                <div className="w-full h-px bg-cyber-primary/20"></div>
+              </div>
+            )}
+
+            {/* Single File Upload Section */}
+            {!showMetadataForm && !selectedFile && (
+              <div className="rounded-2xl border-2 border-dashed border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group cursor-pointer">
+                <input
+                  type="file"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  accept="video/*"
+                  onChange={handleFileSelect}
+                />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
+                      <UploadIcon className="w-8 h-8 text-cyber-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-cyber-text-light dark:text-white group-hover:text-cyber-primary transition-colors">
+                        Datei hochladen
+                      </h3>
+                      <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
+                        Drag & Drop oder klicken
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-cyber-primary/40 group-hover:text-cyber-primary transition-colors" />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {uploadMode === 'batch' && (
+          <>
+            {/* Batch File Upload Section */}
+            <div className="rounded-2xl border-2 border-dashed border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group cursor-pointer">
+              <input
+                type="file"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                accept="video/*"
+                multiple
+                onChange={handleFileSelect}
+              />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
+                    <UploadIcon className="w-8 h-8 text-cyber-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-cyber-text-light dark:text-white group-hover:text-cyber-primary transition-colors">
+                      Mehrere Dateien hochladen
+                    </h3>
+                    <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
+                      Drag & Drop oder klicken - Mehrfachauswahl möglich
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="w-6 h-6 text-cyber-primary/40 group-hover:text-cyber-primary transition-colors" />
               </div>
             </div>
 
-            <form onSubmit={handleFetchMetadata} className="flex-1 flex flex-col">
-              <div className="space-y-4">
-                <input
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://youtube.com/watch?v=..."
-                  className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white placeholder-cyber-text-light/50 dark:placeholder-white/50 focus:outline-none focus:border-cyber-primary transition-all"
-                />
+            {/* Selected Files Display */}
+            {selectedFiles.length > 0 && (
+              <div className="rounded-2xl border border-cyber-primary/20 bg-white/80 dark:bg-gray-800/80 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-cyber-text-light dark:text-white">
+                    Ausgewählte Dateien ({selectedFiles.length})
+                  </h3>
+                  <button
+                    onClick={resetBatchUpload}
+                    className="text-cyber-text-light/60 dark:text-white/60 hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {selectedFiles.map((file, index) => {
+                    const fileId = getFileId(file);
+                    const status = batchStatus[fileId] || 'pending';
+                    const progress = batchProgress[fileId] || 0;
+                    
+                    return (
+                      <div key={fileId} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div className="flex items-center gap-3 flex-1">
+                          <Film className="w-5 h-5 text-cyber-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-cyber-text-light dark:text-white truncate">
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-cyber-text-light/60 dark:text-white/60">
+                              {(file.size / 1024 / 1024).toFixed(1)} MB
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {status === 'pending' && (
+                            <span className="text-xs text-cyber-text-light/60 dark:text-white/60">Warteschlange</span>
+                          )}
+                          {status === 'uploading' && (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin text-cyber-primary" />
+                              <span className="text-xs text-cyber-primary">{progress}%</span>
+                            </div>
+                          )}
+                          {status === 'completed' && (
+                            <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          )}
+                          {status === 'error' && (
+                            <AlertCircle className="w-4 h-4 text-red-500" />
+                          )}
+                          
+                          <button
+                            onClick={() => removeFileFromBatch(file)}
+                            className="text-cyber-text-light/40 dark:text-white/40 hover:text-red-500 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Batch Metadata Form */}
+            {selectedFiles.length > 0 && (
+              <div className="rounded-2xl border border-cyber-primary/20 bg-white/80 dark:bg-gray-800/80 p-6">
+                <h3 className="text-lg font-semibold text-cyber-text-light dark:text-white mb-4">
+                  Gemeinsame Metadaten für alle Videos
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-cyber-text-light dark:text-white mb-2">
+                      Kategorie
+                    </label>
+                    <select
+                      value={batchMetadata.category}
+                      onChange={(e) => setBatchMetadata(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white focus:outline-none focus:border-cyber-primary transition-all"
+                    >
+                      <option value="">Kategorie wählen</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        checked={batchMetadata.transcode}
+                        onChange={(e) => setBatchMetadata(prev => ({ ...prev, transcode: e.target.checked }))}
+                        className="w-5 h-5 text-cyber-primary bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded focus:ring-cyber-primary focus:ring-2"
+                      />
+                      <span className="text-sm font-medium text-cyber-text-light dark:text-white">
+                        Videos transkodieren (nacheinander verarbeitet)
+                      </span>
+                    </label>
+                    <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-1 ml-8">
+                      Konvertiert Videos für bessere Kompatibilität und kleinere Dateigröße
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-cyber-text-light dark:text-white mb-2">
+                    Tags (durch Komma getrennt)
+                  </label>
+                  <input
+                    type="text"
+                    value={batchMetadata.tags}
+                    onChange={(e) => setBatchMetadata(prev => ({ ...prev, tags: e.target.value }))}
+                    placeholder="z.B. tutorial, gaming, review"
+                    className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white placeholder-cyber-text-light/50 dark:placeholder-white/50 focus:outline-none focus:border-cyber-primary transition-all"
+                  />
+                </div>
+                
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-cyber-text-light dark:text-white mb-2">
+                    Beschreibung (optional)
+                  </label>
+                  <textarea
+                    value={batchMetadata.description}
+                    onChange={(e) => setBatchMetadata(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Gemeinsame Beschreibung für alle Videos..."
+                    rows={3}
+                    className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white placeholder-cyber-text-light/50 dark:placeholder-white/50 focus:outline-none focus:border-cyber-primary transition-all resize-none"
+                  />
+                </div>
+                
                 <button
-                  type="submit"
-                  disabled={isLoading || !url}
+                  onClick={handleBatchUpload}
+                  disabled={isLoading || selectedFiles.length === 0}
                   className="w-full mt-6 flex items-center justify-center space-x-2 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <LinkIcon className="w-5 h-5" />
+                    <UploadIcon className="w-5 h-5" />
                   )}
-                  <span>{isLoading ? 'Wird geladen...' : 'Metadaten abrufen'}</span>
+                  <span>
+                    {isLoading
+                      ? `Uploading ${Object.values(batchStatus).filter(s => s === 'uploading').length}/${selectedFiles.length}...`
+                      : `${selectedFiles.length} Videos hochladen`
+                    }
+                  </span>
                 </button>
               </div>
-            </form>
-          </div>
-        )}
-        
-        {/* Separator */}
-        {!showMetadataForm && !selectedFile && (
-          <div className="relative">
-            <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 bg-white dark:bg-gray-800">
-              <span className="text-cyber-text-light/40 dark:text-white/40">oder</span>
-            </div>
-            <div className="w-full h-px bg-cyber-primary/20"></div>
-          </div>
-        )}
-
-        {/* File Upload Section */}
-        {!showMetadataForm && !selectedFile && (
-          <div className="rounded-2xl border-2 border-dashed border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group cursor-pointer">
-            <input
-              type="file"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              accept="video/*"
-              onChange={handleFileSelect}
-            />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
-                  <UploadIcon className="w-8 h-8 text-cyber-primary" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-cyber-text-light dark:text-white group-hover:text-cyber-primary transition-colors">
-                    Datei hochladen
-                  </h3>
-                  <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
-                    Drag & Drop oder klicken
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-6 h-6 text-cyber-primary/40 group-hover:text-cyber-primary transition-colors" />
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
 
