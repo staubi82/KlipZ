@@ -15,7 +15,7 @@ import {
 
 function formatDuration(seconds: number) {
   const mins = Math.floor(seconds / 60);
-const secs = Math.floor(seconds % 60);
+  const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
@@ -42,7 +42,7 @@ export function VideoPlayer() {
   }, [videoId]);
 
   const videoJsOptions = {
-    autoplay: false,
+    autoplay: true,
     controls: true,
     responsive: true,
     fluid: true,
@@ -54,6 +54,10 @@ export function VideoPlayer() {
       const progress = (player.currentTime() / player.duration()) * 100;
       setProgress(progress);
     });
+    player.on('error', (e: any) => {
+      console.error('VideoJS Player error:', player.error());
+      console.error('VideoJS Player error details:', e);
+    });
   };
 
   const shareUrl = window.location.href;
@@ -61,7 +65,16 @@ export function VideoPlayer() {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden">
-        <VideoJS options={videoJsOptions} onReady={handlePlayerReady} />
+        {video && (
+          <video
+            controls
+            autoPlay
+            src={`${API_BASE}/api/videos/${video.id}`}
+            className="w-full h-full"
+          >
+            Ihr Browser unterstützt das Video-Tag nicht.
+          </video>
+        )}
       </div>
 
       <div className="space-y-6">
@@ -78,84 +91,56 @@ export function VideoPlayer() {
                 onClick={() => setIsShareOpen(!isShareOpen)}
                 className="p-3 rounded-xl bg-cyber-primary/10 text-cyber-text-light dark:text-white hover:bg-cyber-primary/20 transition-all"
               >
-                <Share2 className="w-5 h-5" />
+                Teilen
               </button>
-              
               {isShareOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white dark:bg-gray-800 shadow-lg border border-cyber-primary/20 overflow-hidden">
-                  <div className="p-2 space-y-2">
-                    <FacebookShareButton url={shareUrl} className="w-full">
-                      <div className="flex items-center space-x-2 p-2 hover:bg-cyber-primary/10 rounded-lg transition-all">
-                        <FacebookIcon size={24} round />
-                        <span className="text-cyber-text-light dark:text-white">Facebook</span>
-                      </div>
-                    </FacebookShareButton>
-                    
-                    <TwitterShareButton url={shareUrl} className="w-full">
-                      <div className="flex items-center space-x-2 p-2 hover:bg-cyber-primary/10 rounded-lg transition-all">
-                        <TwitterIcon size={24} round />
-                        <span className="text-cyber-text-light dark:text-white">Twitter</span>
-                      </div>
-                    </TwitterShareButton>
-                    
-                    <WhatsappShareButton url={shareUrl} className="w-full">
-                      <div className="flex items-center space-x-2 p-2 hover:bg-cyber-primary/10 rounded-lg transition-all">
-                        <WhatsappIcon size={24} round />
-                        <span className="text-cyber-text-light dark:text-white">WhatsApp</span>
-                      </div>
-                    </WhatsappShareButton>
-                  </div>
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded shadow-lg p-4 space-y-2">
+                  <FacebookShareButton url={shareUrl} quote={video?.title}>
+                    <FacebookIcon size={32} round />
+                  </FacebookShareButton>
+                  <TwitterShareButton url={shareUrl} title={video?.title}>
+                    <TwitterIcon size={32} round />
+                  </TwitterShareButton>
+                  <WhatsappShareButton url={shareUrl} title={video?.title}>
+                    <WhatsappIcon size={32} round />
+                  </WhatsappShareButton>
                 </div>
               )}
             </div>
-
-            {video && (
-              <a
-                href={`/api/videos/${video.id}`}
-                download
-                className="p-3 rounded-xl bg-cyber-primary/10 text-cyber-text-light dark:text-white hover:bg-cyber-primary/20 transition-all"
-              >
-                <Download className="w-5 h-5" />
-              </a>
-            )}
           </div>
         </div>
 
-        {video && (
-          <div className="text-cyber-text-light dark:text-white whitespace-pre-line">
-            {video.description}
-          </div>
-        )}
+        {/* Weitere Inhalte wie Beschreibung, Likes, Kommentare etc. */}
+      </div>
 
-        <div className="border-t border-cyber-primary/20 pt-8">
-          <h3 className="text-xl font-bold text-cyber-text-light dark:text-white mb-6">
-            Ähnliche Videos
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {recommendedVideos.slice(0, 8).map((video) => (
-              <Link
-                to={`/video/${video.id}`}
-                key={video.id}
-                className="group relative overflow-hidden"
-              >
-                <div className="relative aspect-video rounded-xl border border-cyber-primary/20 bg-cyber-muted/30 backdrop-blur-xl overflow-hidden transition-all duration-300 group-hover:border-cyber-primary/40">
-                  <img
-                    src={video.thumbnail}
-                    alt={video.title}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-                    <h4 className="text-sm font-semibold text-white truncate">
-                      {video.title}
-                    </h4>
-                  </div>
-                  <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-                    {formatDuration(video.duration)}
-                  </div>
+      <div className="border-t border-cyber-primary/20 pt-8">
+        <h3 className="text-xl font-bold text-cyber-text-light dark:text-white mb-6">
+          Ähnliche Videos
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {recommendedVideos.slice(0, 8).map((video) => (
+            <Link
+              to={`/video/${video.id}`}
+              key={video.id}
+              className="group relative overflow-hidden"
+            >
+              <div className="relative aspect-video rounded-xl border border-cyber-primary/20 bg-cyber-muted/30 backdrop-blur-xl overflow-hidden transition-all duration-300 group-hover:border-cyber-primary/40">
+                <img
+                  src={`${API_BASE}${video.thumbnail}`}
+                  alt={video.title}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                  <h4 className="text-sm font-semibold text-white truncate">
+                    {video.title}
+                  </h4>
                 </div>
-              </Link>
-            ))}
-          </div>
+                <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
+                  {formatDuration(video.duration)}
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
     </div>

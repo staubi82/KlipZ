@@ -5,7 +5,6 @@ export function Upload() {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [urlPreview, setUrlPreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -14,6 +13,12 @@ export function Upload() {
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [category, setCategory] = useState('');
+
+  // New state for URL import metadata
+  const [fetchedMetadata, setFetchedMetadata] = useState<any>(null);
+  const [showMetadataForm, setShowMetadataForm] = useState(false);
+  const [originalUrl, setOriginalUrl] = useState('');
+
 
   const API_BASE = 'http://localhost:3301';
 
@@ -67,15 +72,26 @@ export function Upload() {
       formData.append('video', selectedFile);
       formData.append('title', title);
       formData.append('description', description);
+      // Add category, tags, and visibility if your backend supports it
+      // formData.append('category', category);
+      // formData.append('tags', JSON.stringify(tags)); // Assuming backend expects JSON string
+      // formData.append('isPublic', isPublic.toString());
+
       const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Upload fehlgeschlagen');
+      
+      // Reset form after successful upload
       setSelectedFile(null);
       setPreviewUrl(null);
       setTitle('');
       setDescription('');
       setTags([]);
+      setCategory('');
+      setIsPublic(true);
+
     } catch (err) {
       console.error('Fehler beim Upload:', err);
+      // Optionally show an error message to the user
     } finally {
       setIsLoading(false);
     }
@@ -85,29 +101,106 @@ export function Upload() {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const handleUrlSubmit = async (e: React.FormEvent) => {
+  // Function to fetch metadata from URL
+  const handleFetchMetadata = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setFetchedMetadata(null); // Clear previous metadata
+    setShowMetadataForm(false); // Hide form while fetching
+
     try {
-      const response = await fetch(`${API_BASE}/api/upload`, {
+      const response = await fetch(`${API_BASE}/api/fetch-metadata`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, title, description })
+        body: JSON.stringify({ url })
       });
+
       if (!response.ok) {
-        throw new Error('Fehler beim Upload');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Abrufen der Metadaten');
       }
-      setUrl('');
-      setTitle('');
-      setDescription('');
-      setTags([]);
-      setUrlPreview(null);
-    } catch (error) {
-      console.error('Fehler beim Laden der Video-Metadaten:', error);
+
+      const metadata = await response.json();
+      setFetchedMetadata(metadata);
+      setOriginalUrl(url); // Store original URL for import
+      setTitle(metadata.title || ''); // Populate title from metadata
+      setDescription(metadata.description || ''); // Populate description from metadata
+      setTags([]); // Reset tags for new video
+      setCategory(''); // Reset category for new video
+      setIsPublic(true); // Default to public
+      setShowMetadataForm(true); // Show the metadata form
+
+    } catch (error: any) {
+      console.error('Fehler beim Abrufen der Video-Metadaten:', error);
+      // Optionally show an error message to the user
+      alert(`Fehler: ${error.message}`); // Simple alert for now
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Function to handle the final URL import
+  const handleImportUrl = async () => {
+    if (!fetchedMetadata || !originalUrl) return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/import-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: originalUrl,
+          title,
+          description,
+          category, // Include category and tags in the import request
+          tags,
+          isPublic // Include visibility
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Importieren des Videos');
+      }
+
+      // Reset form after successful import
+      setUrl('');
+      setFetchedMetadata(null);
+      setShowMetadataForm(false);
+      setOriginalUrl('');
+      setTitle('');
+      setDescription('');
+      setTags([]);
+      setCategory('');
+      setIsPublic(true);
+
+      alert('Video erfolgreich importiert!'); // Success message
+
+    } catch (error: any) {
+      console.error('Fehler beim Importieren der URL:', error);
+      // Optionally show an error message to the user
+      alert(`Fehler beim Importieren: ${error.message}`); // Simple alert for now
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setUrl('');
+    setFetchedMetadata(null);
+    setShowMetadataForm(false);
+    setOriginalUrl('');
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setUploadProgress(0);
+    setTags([]);
+    setTitle('');
+    setDescription('');
+    setCategory('');
+    setIsPublic(true);
+    setIsLoading(false);
+  };
+
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 relative">
@@ -122,92 +215,103 @@ export function Upload() {
       </div>
       
       <div className="space-y-6">
-        <div className="rounded-2xl border border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
-                <LinkIcon className="w-8 h-8 text-cyber-primary" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-cyber-text-light dark:text-white">URL Import</h3>
-                <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
-                  YouTube oder andere Plattformen
-                </p>
+        {/* URL Import Section */}
+        {!showMetadataForm && !selectedFile && (
+          <div className="rounded-2xl border border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
+                  <LinkIcon className="w-8 h-8 text-cyber-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-cyber-text-light dark:text-white">URL Import</h3>
+                  <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
+                    YouTube oder andere Plattformen
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <form onSubmit={handleUrlSubmit} className="flex-1 flex flex-col">
-            <div className="space-y-4">
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://youtube.com/watch?v=..."
-                className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white placeholder-cyber-text-light/50 dark:placeholder-white/50 focus:outline-none focus:border-cyber-primary transition-all"
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !url}
-                className="w-full mt-6 flex items-center justify-center space-x-2 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <LinkIcon className="w-5 h-5" />
-                )}
-                <span>{isLoading ? 'Wird geladen...' : 'Video importieren'}</span>
-              </button>
-            </div>
-          </form>
-        </div>
+            <form onSubmit={handleFetchMetadata} className="flex-1 flex flex-col">
+              <div className="space-y-4">
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=..."
+                  className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white placeholder-cyber-text-light/50 dark:placeholder-white/50 focus:outline-none focus:border-cyber-primary transition-all"
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading || !url}
+                  className="w-full mt-6 flex items-center justify-center space-x-2 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <LinkIcon className="w-5 h-5" />
+                  )}
+                  <span>{isLoading ? 'Wird geladen...' : 'Metadaten abrufen'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
         
-        <div className="relative">
-          <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 bg-white dark:bg-gray-800">
-            <span className="text-cyber-text-light/40 dark:text-white/40">oder</span>
-          </div>
-          <div className="w-full h-px bg-cyber-primary/20"></div>
-        </div>
-
-        <div className="rounded-2xl border-2 border-dashed border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group cursor-pointer">
-          <input
-            type="file"
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            accept="video/*"
-            onChange={handleFileSelect}
-          />
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
-                <UploadIcon className="w-8 h-8 text-cyber-primary" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-cyber-text-light dark:text-white group-hover:text-cyber-primary transition-colors">
-                  Datei hochladen
-                </h3>
-                <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
-                  Drag & Drop oder klicken
-                </p>
-              </div>
+        {/* Separator */}
+        {!showMetadataForm && !selectedFile && (
+          <div className="relative">
+            <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 bg-white dark:bg-gray-800">
+              <span className="text-cyber-text-light/40 dark:text-white/40">oder</span>
             </div>
-            <ArrowRight className="w-6 h-6 text-cyber-primary/40 group-hover:text-cyber-primary transition-colors" />
+            <div className="w-full h-px bg-cyber-primary/20"></div>
           </div>
-        </div>
+        )}
+
+        {/* File Upload Section */}
+        {!showMetadataForm && !selectedFile && (
+          <div className="rounded-2xl border-2 border-dashed border-cyber-primary/20 hover:border-cyber-primary/40 transition-colors p-8 relative group cursor-pointer">
+            <input
+              type="file"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              accept="video/*"
+              onChange={handleFileSelect}
+            />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 rounded-xl bg-cyber-primary/10 flex items-center justify-center">
+                  <UploadIcon className="w-8 h-8 text-cyber-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-cyber-text-light dark:text-white group-hover:text-cyber-primary transition-colors">
+                    Datei hochladen
+                  </h3>
+                  <p className="text-cyber-text-light/60 dark:text-white/60 mt-1">
+                    Drag & Drop oder klicken
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-6 h-6 text-cyber-primary/40 group-hover:text-cyber-primary transition-colors" />
+            </div>
+          </div>
+        )}
       </div>
 
-      {(selectedFile || urlPreview) && (
+      {/* Metadata Form or File Upload Preview */}
+      {(showMetadataForm || selectedFile) && (
         <>
           <div className="rounded-2xl border border-cyber-primary/20 bg-white/80 dark:bg-gray-800/80 p-8">
             <div className="space-y-8">
               <div className="flex items-center gap-4">
                 <CheckCircle2 className="w-6 h-6 text-green-500" />
                 <span className="text-lg font-semibold text-cyber-text-light dark:text-white">
-                  {selectedFile ? 'Video ausgewählt' : 'Video geladen'}
+                  {selectedFile ? 'Video ausgewählt' : 'Metadaten geladen'}
                 </span>
               </div>
 
               <div className="space-y-6">
-                {(previewUrl || urlPreview) && (
+                {/* Video Preview / Thumbnail */}
+                {(previewUrl || (fetchedMetadata && fetchedMetadata.thumbnail)) && (
                   <div className="relative aspect-video rounded-lg overflow-hidden bg-cyber-primary/5 group">
                     {previewUrl ? (
                       <video
@@ -217,7 +321,7 @@ export function Upload() {
                       />
                     ) : (
                       <img
-                        src={urlPreview}
+                        src={fetchedMetadata.thumbnail}
                         alt="Video Vorschau"
                         className="w-full h-full object-cover"
                       />
@@ -225,6 +329,7 @@ export function Upload() {
                   </div>
                 )}
                 
+                {/* Upload Progress for File Upload */}
                 {selectedFile && <div className="relative pt-1">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
@@ -242,6 +347,7 @@ export function Upload() {
                   </div>
                 </div>}
 
+                {/* Metadata Fields (Title, Description, Category, Tags, Visibility) */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
                     Titel
@@ -355,28 +461,40 @@ export function Upload() {
               <div className="flex items-center gap-4 mt-8">
                 <button
                   type="button"
-                  onClick={() => {
-                    setUrl('');
-                    setUrlPreview(null);
-                    setSelectedFile(null);
-                    setPreviewUrl(null);
-                    setUploadProgress(0);
-                    setTags([]);
-                    setTitle('');
-                    setDescription('');
-                  }}
+                  onClick={handleCancel}
                   className="flex-1 py-4 px-6 rounded-xl border-2 border-cyber-primary/30 text-cyber-text-light dark:text-white hover:bg-cyber-primary/5 transition-all duration-300"
                 >
                   Abbrechen
                 </button>
-                <button
-                  type="button"
-                  className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2"
-                  onClick={handleUpload}
-                >
-                  <UploadIcon className="w-5 h-5" />
-                  <span>Video hochladen</span>
-                </button>
+                {showMetadataForm ? (
+                   <button
+                    type="button"
+                    className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleImportUrl}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <UploadIcon className="w-5 h-5" />
+                    )}
+                    <span>{isLoading ? 'Wird importiert...' : 'Video importieren'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleUpload}
+                    disabled={isLoading || !selectedFile}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <UploadIcon className="w-5 h-5" />
+                    )}
+                    <span>{isLoading ? 'Wird hochgeladen...' : 'Video hochladen'}</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

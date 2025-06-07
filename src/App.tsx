@@ -20,17 +20,15 @@ function App() {
           {/* Öffentliche Routen */}
           <Route path="/login" element={<Login />} />
           
-          {/* Geschützte Routen */}
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/upload" element={<Upload />} />
-              <Route path="/video/:id" element={<VideoPlayer />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/trending" element={<Trending />} />
-              <Route path="/new" element={<NewDrops />} />
-              <Route path="/profile" element={<Profile />} />
-            </Route>
+          {/* Routen ohne Login-Schutz */}
+          <Route element={<Layout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/upload" element={<Upload />} />
+            <Route path="/video/:id" element={<VideoPlayer />} />
+            <Route path="/favorites" element={<Favorites />} />
+            <Route path="/trending" element={<Trending />} />
+            <Route path="/new" element={<NewDrops />} />
+            <Route path="/profile" element={<Profile />} />
           </Route>
           
           {/* Umleitung für alle anderen Pfade */}
