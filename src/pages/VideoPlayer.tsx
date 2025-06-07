@@ -20,7 +20,8 @@ function formatDuration(seconds: number) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-const API_BASE = 'http://localhost:3301';
+import { API_BASE } from '../config';
+
 export function VideoPlayer() {
   const { id } = useParams();
   const [isShareOpen, setIsShareOpen] = useState(false);

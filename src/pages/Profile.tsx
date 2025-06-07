@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Mail, User as UserIcon, Save, Film, Eye, Lock, Activity, Pencil, Trash2, Plus, Tag } from 'lucide-react';
+import { API_BASE } from '../config';
 export function Profile() {
   const [username, setUsername] = useState('CyberCreator');
   const [email, setEmail] = useState('cybercreator@example.com');
@@ -580,7 +581,7 @@ export function Profile() {
               <React.Fragment key={video.id}>
                 <tr className="border-b border-cyber-primary/10 hover:bg-cyber-primary/5 transition-colors">
                   <td className="py-2 px-4">
-                    <img src={video.thumbnail.startsWith('http') ? video.thumbnail : `http://localhost:3301${video.thumbnail}`} alt={video.title} className="w-20 h-12 object-cover rounded border border-cyber-primary/30 dark:border-cyber-primary/60" />
+                    <img src={video.thumbnail.startsWith('http') ? video.thumbnail : `${API_BASE}${video.thumbnail}`} alt={video.title} className="w-20 h-12 object-cover rounded border border-cyber-primary/30 dark:border-cyber-primary/60" />
                   </td>
                   <td className="py-2 px-4 font-semibold text-cyber-text-light dark:text-white">{video.title.length > 30 ? video.title.substring(0, 20) + '...' : video.title}</td>
                   <td className="py-2 px-4 text-cyber-text-light dark:text-white">{video.description.length > 50 ? video.description.substring(0, 50) + '...' : video.description}</td>

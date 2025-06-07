@@ -2,6 +2,7 @@ import React, { useState, FormEvent } from 'react';
 import { Video, User, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
+import { API_BASE } from '../config';
 
 export function Register() {
   const [username, setUsername] = useState('');
@@ -35,7 +36,7 @@ export function Register() {
     setLoading(true);
     
     try {
-      const response = await fetch('http://localhost:3301/api/auth/register', {
+      const response = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

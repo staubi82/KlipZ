@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Play, Clock, Siren as Fire, Star, Gamepad2, Music, Tv2, Rocket, Plus } from 'lucide-react';
 import { VideoPreviewHover } from '../components/VideoPreviewHover';
+import { API_BASE } from '../config';
 interface VideoItem {
   id: number;
   title: string;
@@ -24,7 +25,6 @@ export function Dashboard() {
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [categories, setCategories] = useState<Array<{name: string, count: number}>>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('Alle');
-  const API_BASE = 'http://localhost:3301';
 
   useEffect(() => {
     // Load categories with counts

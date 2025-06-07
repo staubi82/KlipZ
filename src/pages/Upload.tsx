@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Upload as UploadIcon, Link as LinkIcon, Loader2, X, Film, AlertCircle, ArrowRight, CheckCircle2, Globe, Lock as LockIcon } from 'lucide-react';
 import { VideoJS } from '../components/VideoJS'; // Import VideoJS component
+import { API_BASE } from '../config';
 
 export function Upload() {
   const [url, setUrl] = useState('');
@@ -43,8 +44,6 @@ export function Upload() {
   const [importProgress, setImportProgress] = useState(0); // New state for import progress
   const [importStatus, setImportStatus] = useState<'pending' | 'completed' | 'error' | null>(null); // New state for import status
 
-
-  const API_BASE = 'http://localhost:3301';
 
   const [userCategories, setUserCategories] = useState<string[]>([]);
   const [categories, setCategories] = useState<any[]>([]);

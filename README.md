@@ -9,10 +9,22 @@ Dieses Repository enthält das Frontend-Design im Ordner `src` und ein Node.js-B
    git clone <REPO-URL>
    cd Klipzz
    ```
-2. Abhängigkeiten installieren. Node.js sowie `ffmpeg` und `yt-dlp` müssen auf dem System vorhanden sein.
+2. Umgebungsvariablen konfigurieren:
+   ```bash
+   cp .env.example .env
+   ```
+   Bearbeite die `.env`-Datei und passe die API-URL an deine Bedürfnisse an.
+
+3. Abhängigkeiten installieren. Node.js sowie `ffmpeg` und `yt-dlp` müssen auf dem System vorhanden sein.
    ```bash
    npm install
    ```
+
+## Umgebungsvariablen
+
+Die Anwendung verwendet folgende Umgebungsvariablen:
+
+- `VITE_API_BASE`: Die Basis-URL für das Backend-API (Standard: `http://localhost:3301`)
 
 ## Frontend starten
 

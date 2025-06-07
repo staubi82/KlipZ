@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { useVideoStore } from '../hooks/useVideoStore';
+import { API_BASE } from '../config';
 
 interface VideoItem {
   id: number;
@@ -18,7 +19,6 @@ export function Favorites() {
   const { favorites } = useVideoStore();
   const [allVideos, setAllVideos] = useState<VideoItem[]>([]);
   const [favoriteVideos, setFavoriteVideos] = useState<VideoItem[]>([]);
-  const API_BASE = 'http://localhost:3301';
 
   useEffect(() => {
     // Videos vom Server laden
