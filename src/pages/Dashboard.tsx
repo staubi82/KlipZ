@@ -111,26 +111,6 @@ export function Dashboard() {
                   </div>
                 </div>
               </Link>
-              <button
-                onClick={async () => {
-                  if (window.confirm(`Video "${video.title}" wirklich löschen?`)) {
-                    try {
-                      const response = await fetch(`${API_BASE}/api/videos/${video.id}`, { method: 'DELETE' });
-                      if (response.ok) {
-                        alert('Video gelöscht');
-                        window.location.reload();
-                      } else {
-                        alert('Fehler beim Löschen des Videos');
-                      }
-                    } catch (error) {
-                      alert('Fehler beim Löschen des Videos');
-                    }
-                  }
-                }}
-                className="mt-2 w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
-              >
-                Löschen
-              </button>
             </div>
           ))}
         </div>

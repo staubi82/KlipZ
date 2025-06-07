@@ -5,7 +5,7 @@ export function Upload() {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0); // For file upload
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState('');
@@ -14,10 +14,13 @@ export function Upload() {
   const [isPublic, setIsPublic] = useState(true);
   const [category, setCategory] = useState('');
 
-  // New state for URL import metadata
+  // State for URL import
   const [fetchedMetadata, setFetchedMetadata] = useState<any>(null);
   const [showMetadataForm, setShowMetadataForm] = useState(false);
   const [originalUrl, setOriginalUrl] = useState('');
+  const [importId, setImportId] = useState<string | null>(null); // New state for import ID
+  const [importProgress, setImportProgress] = useState(0); // New state for import progress
+  const [importStatus, setImportStatus] = useState<'pending' | 'completed' | 'error' | null>(null); // New state for import status
 
 
   const API_BASE = 'http://localhost:3301';
@@ -144,6 +147,9 @@ export function Upload() {
     if (!fetchedMetadata || !originalUrl) return;
 
     setIsLoading(true);
+    setImportStatus('pending'); // Set import status to pending
+    setImportProgress(0); // Reset progress
+
     try {
       const response = await fetch(`${API_BASE}/api/import-url`, {
         method: 'POST',
@@ -152,36 +158,52 @@ export function Upload() {
           url: originalUrl,
           title,
           description,
-          category, // Include category and tags in the import request
+          category,
           tags,
-          isPublic // Include visibility
+          isPublic
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Fehler beim Importieren des Videos');
+        throw new Error(errorData.message || 'Fehler beim Starten des Imports');
       }
 
-      // Reset form after successful import
-      setUrl('');
-      setFetchedMetadata(null);
-      setShowMetadataForm(false);
-      setOriginalUrl('');
-      setTitle('');
-      setDescription('');
-      setTags([]);
-      setCategory('');
-      setIsPublic(true);
+      const { importId } = await response.json();
+      setImportId(importId); // Store the import ID
 
-      alert('Video erfolgreich importiert!'); // Success message
+      // Start listening for progress updates
+      const eventSource = new EventSource(`${API_BASE}/api/import-progress/${importId}`);
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        setImportProgress(data.progress);
+        setImportStatus(data.status);
+
+        if (data.status !== 'pending') {
+          eventSource.close(); // Close connection when import is done
+          setIsLoading(false); // Stop loading indicator
+          // No alert here, status is handled in the overlay
+          // Optionally redirect to the video page using data.videoId if data.status === 'completed'
+          // if (data.status === 'completed' && data.videoId) {
+          //   navigate(`/video/${data.videoId}`);
+          // }
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error('SSE Fehler:', err);
+        eventSource.close();
+        setIsLoading(false);
+        setImportStatus('error');
+        // No alert here, status is handled in the overlay
+      };
 
     } catch (error: any) {
-      console.error('Fehler beim Importieren der URL:', error);
-      // Optionally show an error message to the user
-      alert(`Fehler beim Importieren: ${error.message}`); // Simple alert for now
-    } finally {
+      console.error('Fehler beim Starten des URL-Imports:', error);
       setIsLoading(false);
+      setImportStatus('error');
+      // No alert here, status is handled in the overlay
     }
   };
 
@@ -192,18 +214,93 @@ export function Upload() {
     setOriginalUrl('');
     setSelectedFile(null);
     setPreviewUrl(null);
-    setUploadProgress(0);
+    setUploadProgress(0); // For file upload
     setTags([]);
     setTitle('');
     setDescription('');
     setCategory('');
     setIsPublic(true);
     setIsLoading(false);
+    setImportId(null); // Reset import states
+    setImportProgress(0);
+    setImportStatus(null);
   };
 
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 relative">
+      {/* Loading/Status Overlay */}
+      {/* Loading/Status Overlay */}
+      {(importStatus === 'pending' || importStatus === 'completed' || importStatus === 'error') && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 rounded-2xl">
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg text-center">
+            {importStatus === 'pending' && (
+              <>
+                <Loader2 className="w-12 h-12 text-cyber-primary animate-spin mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
+                  Video wird importiert...
+                </h3>
+                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+                  Bitte warten Sie, während das Video heruntergeladen und verarbeitet wird.
+                </p>
+                {/* Import Progress Bar */}
+                <div className="relative pt-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
+                      Fortschritt
+                    </span>
+                    <span className="text-sm font-medium text-cyber-primary">
+                      {importProgress.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="overflow-hidden h-3 rounded-full bg-cyber-primary/20">
+                    <div
+                      style={{ width: `${importProgress}%` }}
+                      className="h-full bg-cyber-primary transition-all duration-300 rounded-full"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            {importStatus === 'completed' && (
+              <>
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
+                  Import erfolgreich!
+                </h3>
+                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+                  Ihr Video wurde erfolgreich importiert und verarbeitet.
+                </p>
+                <button
+                  onClick={handleCancel} // Use handleCancel to close and reset
+                  className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
+                >
+                  Schließen
+                </button>
+              </>
+            )}
+            {importStatus === 'error' && (
+              <>
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
+                  Import fehlgeschlagen
+                </h3>
+                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+                  Es gab einen Fehler beim Importieren Ihres Videos. Bitte versuchen Sie es erneut.
+                  {/* Optionally display error details: {downloadProgress[importId]?.error} */}
+                </p>
+                 <button
+                  onClick={handleCancel} // Use handleCancel to close and reset
+                  className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
+                >
+                  Schließen
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="relative">
         <h1 className="text-4xl font-black text-cyber-text-light dark:text-white tracking-wider flex items-center gap-3">
           <Film className="w-10 h-10 text-cyber-primary" />
@@ -330,22 +427,24 @@ export function Upload() {
                 )}
                 
                 {/* Upload Progress for File Upload */}
-                {selectedFile && <div className="relative pt-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
-                      Upload Fortschritt
-                    </span>
-                    <span className="text-sm font-medium text-cyber-primary">
-                      {uploadProgress}%
-                    </span>
+                {selectedFile && (
+                  <div className="relative pt-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
+                        Upload Fortschritt
+                      </span>
+                      <span className="text-sm font-medium text-cyber-primary">
+                        {uploadProgress}%
+                      </span>
+                    </div>
+                    <div className="overflow-hidden h-2 rounded-full bg-cyber-primary/10">
+                      <div
+                        style={{ width: `${uploadProgress}%` }}
+                        className="h-full bg-cyber-primary transition-all duration-300 rounded-full relative overflow-hidden"
+                      />
+                    </div>
                   </div>
-                  <div className="overflow-hidden h-2 rounded-full bg-cyber-primary/10">
-                    <div
-                      style={{ width: `${uploadProgress}%` }}
-                      className="h-full bg-cyber-primary transition-all duration-300 rounded-full relative overflow-hidden"
-                    />
-                  </div>
-                </div>}
+                )}
 
                 {/* Metadata Fields (Title, Description, Category, Tags, Visibility) */}
                 <div className="space-y-2">
@@ -467,18 +566,26 @@ export function Upload() {
                   Abbrechen
                 </button>
                 {showMetadataForm ? (
-                   <button
+                  <button
                     type="button"
                     className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleImportUrl}
-                    disabled={isLoading}
+                    disabled={isLoading || importStatus === 'pending'} // Disable while importing
                   >
-                    {isLoading ? (
+                    {isLoading && importStatus === 'pending' ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                       <UploadIcon className="w-5 h-5" />
                     )}
-                    <span>{isLoading ? 'Wird importiert...' : 'Video importieren'}</span>
+                    <span>
+                      {isLoading && importStatus === 'pending'
+                        ? 'Wird importiert...'
+                        : importStatus === 'completed'
+                        ? 'Import abgeschlossen'
+                        : importStatus === 'error'
+                        ? 'Import fehlgeschlagen'
+                        : 'Video importieren'}
+                    </span>
                   </button>
                 ) : (
                   <button
