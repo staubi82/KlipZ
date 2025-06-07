@@ -6,6 +6,8 @@ const Database = require('better-sqlite3');
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // In-memory object to store download progress
 const downloadProgress = {};
@@ -20,6 +22,9 @@ app.use('/thumbnails', express.static(path.join(__dirname, 'thumbnails')));
 
 const db = new Database(path.join(__dirname, 'videos.db'));
 
+// JWT Secret - in production, use environment variable
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
 db.exec(`CREATE TABLE IF NOT EXISTS videos(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT,
@@ -31,6 +36,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS videos(
   category TEXT, -- Added category column
   tags TEXT, -- Added tags column (will store as JSON string)
   is_public INTEGER DEFAULT 1, -- Added is_public column (1 for public, 0 for private)
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
+
+// Create users table for authentication
+db.exec(`CREATE TABLE IF NOT EXISTS users(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  isAdmin INTEGER DEFAULT 0,
+  profilePicture TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )`);
 
@@ -83,6 +99,140 @@ app.post('/api/profile', (req, res) => {
     stmt.run(username, email, bio, avatar);
   }
   res.json({ message: 'Profil gespeichert' });
+});
+
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Auth routes
+app.post('/api/auth/register', async (req, res) => {
+  const { username, email, password } = req.body;
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: 'Username, Email und Passwort sind erforderlich' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'Passwort muss mindestens 6 Zeichen lang sein' });
+  }
+
+  try {
+    // Check if user already exists
+    const existingUser = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, username);
+    if (existingUser) {
+      return res.status(400).json({ message: 'Benutzer mit dieser Email oder diesem Benutzernamen existiert bereits' });
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Insert user
+    const stmt = db.prepare('INSERT INTO users (username, email, password) VALUES (?, ?, ?)');
+    const result = stmt.run(username, email, hashedPassword);
+
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: result.lastInsertRowid,
+        username,
+        email,
+        isAdmin: false
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.status(201).json({
+      _id: result.lastInsertRowid,
+      username,
+      email,
+      isAdmin: false,
+      token
+    });
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Fehler bei der Registrierung' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email und Passwort sind erforderlich' });
+  }
+
+  try {
+    // Find user by email
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    if (!user) {
+      return res.status(401).json({ message: 'Ungültige Anmeldedaten' });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ message: 'Ungültige Anmeldedaten' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        isAdmin: user.isAdmin === 1
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      _id: user.id,
+      username: user.username,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      isAdmin: user.isAdmin === 1,
+      token
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Fehler bei der Anmeldung' });
+  }
+});
+
+// Protected route example
+app.get('/api/auth/me', authenticateToken, (req, res) => {
+  const user = db.prepare('SELECT id, username, email, profilePicture, isAdmin FROM users WHERE id = ?').get(req.user.id);
+  if (!user) {
+    return res.status(404).json({ message: 'Benutzer nicht gefunden' });
+  }
+
+  res.json({
+    _id: user.id,
+    username: user.username,
+    email: user.email,
+    profilePicture: user.profilePicture,
+    isAdmin: user.isAdmin === 1
+  });
 });
 
 // API routes for category management

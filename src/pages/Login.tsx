@@ -1,7 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { Video } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -9,6 +9,9 @@ export function Login() {
   const { login, error, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Check for success message from registration
+  const successMessage = location.state?.message;
   
   // Wenn der Benutzer bereits angemeldet ist, zur Startseite umleiten
   if (isAuthenticated) {
@@ -29,7 +32,7 @@ export function Login() {
   };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-cyber-surface py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-cyber-surface dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Cyberpunk background effects */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,_rgba(0,246,255,0.1),transparent_70%)]"></div>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_70%,_rgba(112,0,255,0.1),transparent_70%)]"></div>
@@ -48,21 +51,26 @@ export function Login() {
             </div>
             <Video className="relative mx-auto h-16 w-16 text-cyber-primary" />
           </div>
-          <h2 className="mt-6 text-4xl font-black text-cyber-primary tracking-wider">
+          <h2 className="mt-6 text-4xl font-black text-cyber-primary dark:text-blue-400 tracking-wider">
             Willkommen bei Klipz! 🚀
           </h2>
-          <p className="mt-2 text-cyber-primary/60">
+          <p className="mt-2 text-cyber-primary/60 dark:text-blue-300/60">
             Dein Portal in die Zukunft des Video-Sharings
           </p>
         </div>
         
         <form className="mt-8 space-y-6 relative" onSubmit={handleSubmit}>
+          {successMessage && (
+            <div className="p-3 bg-green-500/20 border border-green-500/40 rounded-lg text-green-300 text-sm mb-4">
+              {successMessage}
+            </div>
+          )}
           {error && (
             <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-lg text-red-300 text-sm mb-4">
               {error}
             </div>
           )}
-          <div className="rounded-xl bg-cyber-muted/30 backdrop-blur-xl p-8 border border-cyber-primary/20 space-y-6">
+          <div className="rounded-xl bg-cyber-muted/30 dark:bg-gray-800/30 backdrop-blur-xl p-8 border border-cyber-primary/20 dark:border-blue-400/20 space-y-6">
             <div className="space-y-4">
               <div className="relative group">
                 <label htmlFor="email" className="sr-only">E-Mail</label>
@@ -71,12 +79,12 @@ export function Login() {
                   name="email"
                   type="email"
                   required
-                  className="appearance-none rounded-lg relative block w-full px-3 py-2 bg-cyber-surface border border-cyber-primary/30 placeholder-cyber-primary/50 text-cyber-primary focus:border-cyber-primary focus:ring-1 focus:ring-cyber-primary outline-none transition-all duration-300 group-hover:border-cyber-primary/50"
+                  className="appearance-none rounded-lg relative block w-full px-3 py-2 bg-cyber-surface dark:bg-gray-700 border border-cyber-primary/30 dark:border-blue-400/30 placeholder-cyber-primary/50 dark:placeholder-blue-300/50 text-cyber-primary dark:text-blue-300 focus:border-cyber-primary dark:focus:border-blue-400 focus:ring-1 focus:ring-cyber-primary dark:focus:ring-blue-400 outline-none transition-all duration-300 group-hover:border-cyber-primary/50 dark:group-hover:border-blue-400/50"
                   placeholder="E-Mail"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-                <div className="absolute inset-0 bg-cyber-primary/5 rounded-lg filter blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="absolute inset-0 bg-cyber-primary/5 rounded-lg filter blur opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
               </div>
               
               <div className="relative group">
@@ -86,12 +94,12 @@ export function Login() {
                   name="password"
                   type="password"
                   required
-                  className="appearance-none rounded-lg relative block w-full px-3 py-2 bg-cyber-surface border border-cyber-primary/30 placeholder-cyber-primary/50 text-cyber-primary focus:border-cyber-primary focus:ring-1 focus:ring-cyber-primary outline-none transition-all duration-300 group-hover:border-cyber-primary/50"
+                  className="appearance-none rounded-lg relative block w-full px-3 py-2 bg-cyber-surface dark:bg-gray-700 border border-cyber-primary/30 dark:border-blue-400/30 placeholder-cyber-primary/50 dark:placeholder-blue-300/50 text-cyber-primary dark:text-blue-300 focus:border-cyber-primary dark:focus:border-blue-400 focus:ring-1 focus:ring-cyber-primary dark:focus:ring-blue-400 outline-none transition-all duration-300 group-hover:border-cyber-primary/50 dark:group-hover:border-blue-400/50"
                   placeholder="Passwort"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <div className="absolute inset-0 bg-cyber-primary/5 rounded-lg filter blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="absolute inset-0 bg-cyber-primary/5 rounded-lg filter blur opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
               </div>
             </div>
 
@@ -101,9 +109,9 @@ export function Login() {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-cyber-primary focus:ring-cyber-primary border-cyber-primary/30 rounded bg-cyber-surface"
+                  className="h-4 w-4 text-cyber-primary dark:text-blue-400 focus:ring-cyber-primary dark:focus:ring-blue-400 border-cyber-primary/30 dark:border-blue-400/30 rounded bg-cyber-surface dark:bg-gray-700"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-cyber-primary/80">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-cyber-primary/80 dark:text-blue-300/80">
                   Stay connected bleiben
                 </label>
               </div>
@@ -112,7 +120,7 @@ export function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="relative w-full flex justify-center py-3 px-6 text-lg font-bold rounded-xl text-white bg-cyber-primary/20 border border-cyber-primary hover:bg-cyber-primary/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyber-primary/50 overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative w-full flex justify-center py-3 px-6 text-lg font-bold rounded-xl text-white bg-cyber-primary/20 dark:bg-blue-600/20 border border-cyber-primary dark:border-blue-400 hover:bg-cyber-primary/30 dark:hover:bg-blue-600/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyber-primary/50 dark:focus:ring-blue-400/50 overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="absolute inset-0 bg-cyber-primary/10 transform group-hover:translate-y-full transition-transform duration-300"></div>
               <span className="relative">
@@ -126,6 +134,18 @@ export function Login() {
                 )}
               </span>
             </button>
+            
+            <div className="text-center">
+              <p className="text-cyber-primary/60 dark:text-blue-300/60">
+                Noch kein Account?{' '}
+                <Link
+                  to="/register"
+                  className="text-cyber-primary dark:text-blue-400 hover:text-cyber-primary/80 dark:hover:text-blue-300/80 transition-colors duration-300 font-semibold"
+                >
+                  Hier registrieren
+                </Link>
+              </p>
+            </div>
           </div>
         </form>
       </div>

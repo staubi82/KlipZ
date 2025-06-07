@@ -1,12 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Video, User, Sun, Moon, Search, Upload, Menu, X, Home, Star, Clock, History } from 'lucide-react';
-import { useTheme } from '../hooks/useTheme';
+import { Video, User, Sun, Moon, Search, Upload, Menu, X, Home, Star, Clock, History, LogOut } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Navigation() {
-  const { isDark, toggle } = useTheme();
+  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { user, logout, isAuthenticated } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchFocused, setIsSearchFocused] = React.useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
 
   const mainNavItems = [
     { icon: Home, label: 'Home', path: '/' },
@@ -61,28 +64,73 @@ export function Navigation() {
           </div>
           
           <div className="hidden md:flex items-center space-x-4">
-            <Link
-              to="/upload"
-              className="group flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary transition-all"
-            >
-              <Upload className="w-5 h-5 transform transition-transform group-hover:scale-110" />
-              <span className="font-medium">Upload</span>
-            </Link>
-            
-            <Link
-              to="/profile"
-              className="group p-2 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 hover:bg-cyber-primary/10 hover:text-cyber-primary text-gray-600 dark:text-gray-200 transition-all"
-            >
-              <User className="w-5 h-5 transform transition-transform group-hover:scale-110" />
-            </Link>
+            {isAuthenticated && (
+              <Link
+                to="/upload"
+                className="group flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary transition-all"
+              >
+                <Upload className="w-5 h-5 transform transition-transform group-hover:scale-110" />
+                <span className="font-medium">Upload</span>
+              </Link>
+            )}
             
             <button
-              onClick={toggle}
+              onClick={toggleDarkMode}
               className="p-2 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 hover:bg-cyber-primary/10 hover:text-cyber-primary text-gray-600 dark:text-gray-200 transition-all"
             >
-              {isDark ? <Sun className="w-5 h-5 transform transition-transform hover:scale-110" /> : 
-                       <Moon className="w-5 h-5 transform transition-transform hover:scale-110" />}
+              {isDarkMode ? <Sun className="w-5 h-5 transform transition-transform hover:scale-110" /> :
+                           <Moon className="w-5 h-5 transform transition-transform hover:scale-110" />}
             </button>
+            
+            {isAuthenticated ? (
+              <div className="relative">
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="group flex items-center space-x-2 p-2 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 hover:bg-cyber-primary/10 hover:text-cyber-primary text-gray-600 dark:text-gray-200 transition-all"
+                >
+                  <User className="w-5 h-5 transform transition-transform group-hover:scale-110" />
+                  <span className="font-medium text-sm">{user?.username}</span>
+                </button>
+                
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 py-2 z-50">
+                    <Link
+                      to="/profile"
+                      className="flex items-center space-x-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      <User className="w-4 h-4" />
+                      <span>Profil</span>
+                    </Link>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="flex items-center space-x-2 w-full px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Abmelden</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link
+                  to="/login"
+                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-cyber-primary transition-colors"
+                >
+                  Anmelden
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-4 py-2 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary transition-all"
+                >
+                  Registrieren
+                </Link>
+              </div>
+            )}
           </div>
           
           <button
@@ -121,23 +169,60 @@ export function Navigation() {
                 </Link>
               ))}
               
-              <Link
-                to="/upload"
-                className="flex items-center space-x-3 w-full p-3 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Upload className="w-5 h-5 text-gray-600 dark:text-gray-200" />
-                <span className="font-medium">Upload</span>
-              </Link>
+              {isAuthenticated && (
+                <Link
+                  to="/upload"
+                  className="flex items-center space-x-3 w-full p-3 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Upload className="w-5 h-5" />
+                  <span className="font-medium">Upload</span>
+                </Link>
+              )}
               
-              <Link
-                to="/profile"
-                className="flex items-center space-x-3 w-full p-3 rounded-xl hover:bg-cyber-primary/10 text-gray-600 dark:text-gray-300 hover:text-cyber-primary transition-all"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <User className="w-5 h-5" />
-                <span className="font-medium">Mein Space</span>
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link
+                    to="/profile"
+                    className="flex items-center space-x-3 w-full p-3 rounded-xl hover:bg-cyber-primary/10 text-gray-600 dark:text-gray-300 hover:text-cyber-primary transition-all"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <User className="w-5 h-5" />
+                    <span className="font-medium">Profil ({user?.username})</span>
+                  </Link>
+                  
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex items-center space-x-3 w-full p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span className="font-medium">Abmelden</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="flex items-center space-x-3 w-full p-3 rounded-xl hover:bg-cyber-primary/10 text-gray-600 dark:text-gray-300 hover:text-cyber-primary transition-all"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <User className="w-5 h-5" />
+                    <span className="font-medium">Anmelden</span>
+                  </Link>
+                  
+                  <Link
+                    to="/register"
+                    className="flex items-center space-x-3 w-full p-3 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <User className="w-5 h-5" />
+                    <span className="font-medium">Registrieren</span>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
