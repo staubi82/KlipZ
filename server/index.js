@@ -121,12 +121,41 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
       return res.status(400).json({ message: 'Videodatei existiert nicht oder ist leer nach Verschieben.' });
     }
 
-    const thumbPath = await generateThumbnail(permanentFilePath, thumbDir);
-    const duration = await getDuration(permanentFilePath);
+    // Transkodieren Sie das Video
+    console.log(`Starte Transkodierung für: ${permanentFilePath}`);
+    const transcodedFilePath = await transcodeVideo(permanentFilePath, uploadDir);
+    console.log(`Transkodierung abgeschlossen. Transkodierte Datei: ${transcodedFilePath}`);
+
+    // Überprüfen Sie die transkodierte Datei
+    const transcodedFileExists = fs.existsSync(transcodedFilePath);
+    const transcodedFileSize = transcodedFileExists ? fs.statSync(transcodedFilePath).size : 0;
+    console.log(`Transkodierte Datei existiert: ${transcodedFileExists}, Größe: ${transcodedFileSize} Bytes, Pfad: ${transcodedFilePath}`);
+
+    if (!transcodedFileExists || transcodedFileSize === 0) {
+       // Clean up the temporary directory on error
+       fs.rmdir(tempDir, { recursive: true }, (err) => {
+         if (err) console.error('Fehler beim Löschen des temporären Verzeichnisses nach Transkodierungsfehler:', err);
+       });
+       // Löschen Sie die permanente Datei, wenn die Transkodierung fehlschlägt
+       if (permanentFilePath && fs.existsSync(permanentFilePath)) {
+          fs.unlink(permanentFilePath, (unlinkErr) => {
+            if (unlinkErr) console.error('Fehler beim Löschen der ursprünglichen Datei nach Transkodierungsfehler:', unlinkErr);
+          });
+       }
+       return res.status(500).json({ message: 'Transkodierte Videodatei existiert nicht oder ist leer.' });
+    }
+
+    // Löschen Sie die ursprüngliche hochgeladene Datei nach der Transkodierung
+    fs.unlink(permanentFilePath, (err) => {
+      if (err) console.error('Fehler beim Löschen der ursprünglichen Datei nach Transkodierung:', err);
+    });
+
+    const thumbPath = await generateThumbnail(transcodedFilePath, thumbDir);
+    const duration = await getDuration(transcodedFilePath);
 
     // Speichere nur den relativen Pfad für das Thumbnail
     const relativeThumbPath = path.relative(__dirname, thumbPath).replace(/\\/g, '/');
-    const relativeFilePath = path.relative(__dirname, permanentFilePath).replace(/\\/g, '/');
+    const relativeFilePath = path.relative(__dirname, transcodedFilePath).replace(/\\/g, '/');
 
     const stmt = db.prepare('INSERT INTO videos(title, description, filepath, thumbnail, duration, category, tags, is_public) VALUES (?,?,?,?,?,?,?,?)');
     const info = stmt.run(
@@ -154,7 +183,13 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
         if (cleanupErr) console.error('Fehler beim Löschen des temporären Verzeichnisses nach Fehler:', cleanupErr);
       });
     }
-    res.status(500).json({ message: 'Fehler beim Hochladen', error: err.message });
+    // Löschen Sie die permanente Datei, wenn die Transkodierung fehlschlägt
+    if (permanentFilePath && fs.existsSync(permanentFilePath)) {
+       fs.unlink(permanentFilePath, (unlinkErr) => {
+         if (unlinkErr) console.error('Fehler beim Löschen der permanenten Datei nach Transkodierungsfehler:', unlinkErr);
+       });
+    }
+    res.status(500).json({ message: 'Fehler beim Hochladen oder Transkodieren', error: err.message });
   }
 });
 
@@ -319,39 +354,57 @@ app.get('/api/videos/:id', (req, res) => {
   console.log(`Abgerufener Dateipfad aus DB: ${row.filepath}`);
   const filePath = path.resolve(row.filepath);
   console.log(`Aufgelöster Dateipfad: ${filePath}`);
-  const stat = fs.statSync(filePath);
-  const fileSize = stat.size;
-  const range = req.headers.range;
 
-  if (range) {
-    const parts = range.replace(/bytes=/, '').split('-');
-    const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-    if (start >= fileSize || end >= fileSize) {
-      res.status(416).send('Requested range not satisfiable\n' + start + ' >= ' + fileSize);
-      return;
+  fs.stat(filePath, (err, stat) => {
+    if (err) {
+      console.error(`Fehler bei fs.stat für ${filePath}:`, err);
+      return res.status(404).send('Datei nicht gefunden.');
     }
 
-    const chunksize = (end - start) + 1;
-    const file = fs.createReadStream(filePath, { start, end });
-    const head = {
-      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-      'Accept-Ranges': 'bytes',
-      'Content-Length': chunksize,
-      'Content-Type': 'video/mp4',
-    };
+    const fileSize = stat.size;
+    const range = req.headers.range;
 
-    res.writeHead(206, head);
-    file.pipe(res);
-  } else {
-    const head = {
-      'Content-Length': fileSize,
-      'Content-Type': 'video/mp4',
-    };
-    res.writeHead(200, head);
-    fs.createReadStream(filePath).pipe(res);
-  }
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      if (start >= fileSize || end >= fileSize) {
+        res.status(416).send('Requested range not satisfiable\n' + start + ' >= ' + fileSize);
+        return;
+      }
+
+      const chunksize = (end - start) + 1;
+      const file = fs.createReadStream(filePath, { start, end });
+  
+      file.on('error', (streamErr) => {
+        console.error(`Fehler beim Erstellen/Lesen des Streams für ${filePath}:`, streamErr);
+        res.status(500).send('Fehler beim Streamen der Datei.');
+      });
+  
+      const head = {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize,
+        'Content-Type': 'video/mp4', // Annahme: MP4, muss ggf. dynamisch ermittelt werden
+      };
+  
+      res.writeHead(206, head);
+      file.pipe(res);
+    } else {
+      const head = {
+        'Content-Length': fileSize,
+        'Content-Type': 'video/mp4', // Annahme: MP4, muss ggf. dynamisch ermittelt werden
+      };
+      res.writeHead(200, head);
+      const file = fs.createReadStream(filePath);
+      file.on('error', (streamErr) => {
+        console.error(`Fehler beim Erstellen/Lesen des Streams für ${filePath}:`, streamErr);
+        res.status(500).send('Fehler beim Streamen der Datei.');
+      });
+      file.pipe(res);
+    }
+  });
 });
 
 // PUT update video data
@@ -492,8 +545,14 @@ const generateThumbnail = (file, dir) => {
   const thumbPath = path.join(dir, path.basename(file, path.extname(file)) + '.jpg');
   return new Promise((resolve, reject) => {
     ffmpeg(file)
-      .on('end', () => resolve(thumbPath))
-      .on('error', reject)
+      .on('end', () => {
+        console.log(`Thumbnail erfolgreich generiert für: ${file}`);
+        resolve(thumbPath);
+      })
+      .on('error', (err) => {
+        console.error(`Fehler beim Generieren des Thumbnails für ${file}:`, err);
+        reject(err);
+      })
       .screenshots({ count: 1, folder: dir, filename: path.basename(thumbPath) });
   });
 };
@@ -501,11 +560,43 @@ const generateThumbnail = (file, dir) => {
 const getDuration = (file) => {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(file, (err, metadata) => {
-      if (err) return reject(err);
+      if (err) {
+        console.error(`Fehler beim Ermitteln der Dauer für ${file}:`, err);
+        return reject(err);
+      }
+      console.log(`Dauer erfolgreich ermittelt für: ${file}`);
       resolve(metadata.format.duration);
     });
   });
 };
+
+const transcodeVideo = (inputFile, outputDir) => {
+  const outputFileName = path.basename(inputFile, path.extname(inputFile)) + '_transcoded.mp4';
+  const outputFilePath = path.join(outputDir, outputFileName);
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputFile)
+      .outputOptions([
+        '-c:v libx264', // Video-Codec: H.264
+        '-preset fast', // Schnellere Transkodierung
+        '-crf 23', // Qualitätsfaktor (niedriger = besser Qualität, größer = kleinere Datei)
+        '-c:a aac', // Audio-Codec: AAC
+        '-b:a 128k', // Audio-Bitrate
+        '-movflags +faststart' // Für schnelleres Web-Streaming
+      ])
+      .output(outputFilePath)
+      .on('end', () => {
+        console.log(`Video erfolgreich transkodiert: ${inputFile} -> ${outputFilePath}`);
+        resolve(outputFilePath);
+      })
+      .on('error', (err) => {
+        console.error(`Fehler beim Transkodieren des Videos ${inputFile}:`, err);
+        reject(err);
+      })
+      .run();
+  });
+};
+
 
 // SSE endpoint for download progress
 app.get('/api/import-progress/:importId', (req, res) => {

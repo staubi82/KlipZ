@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload as UploadIcon, Link as LinkIcon, Loader2, X, Film, AlertCircle, ArrowRight, CheckCircle2, Globe, Lock as LockIcon } from 'lucide-react';
+import { VideoJS } from '../components/VideoJS'; // Import VideoJS component
 
 export function Upload() {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0); // For file upload
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState('');
@@ -13,6 +13,7 @@ export function Upload() {
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [category, setCategory] = useState('');
+  const [isFormatSupportedForPreview, setIsFormatSupportedForPreview] = useState(true); // New state
 
   // State for URL import
   const [fetchedMetadata, setFetchedMetadata] = useState<any>(null);
@@ -42,18 +43,18 @@ export function Upload() {
       setSelectedFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
-      
-      // Simuliere Upload-Fortschritt
-      setUploadProgress(0);
-      const interval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return prev + 10;
-        });
-      }, 500);
+
+      // Überprüfen Sie, ob der Browser das Videoformat abspielen kann
+      const videoElement = document.createElement('video');
+      const canPlay = videoElement.canPlayType(file.type);
+
+      if (canPlay === '') {
+        console.warn(`Browser kann Dateiformat nicht abspielen: ${file.type}`);
+        setIsFormatSupportedForPreview(false);
+      } else {
+        console.log(`Browser kann Dateiformat abspielen: ${file.type} (${canPlay})`);
+        setIsFormatSupportedForPreview(true);
+      }
     }
   };
 
@@ -67,9 +68,13 @@ export function Upload() {
     }
   };
 
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadOverlayVisible, setUploadOverlayVisible] = useState(false);
+
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsLoading(true);
+    setUploadSuccess(false);
     try {
       const formData = new FormData();
       formData.append('video', selectedFile);
@@ -83,6 +88,8 @@ export function Upload() {
       const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Upload fehlgeschlagen');
       
+      setUploadSuccess(true);
+      setUploadOverlayVisible(true);
       // Reset form after successful upload
       setSelectedFile(null);
       setPreviewUrl(null);
@@ -214,7 +221,6 @@ export function Upload() {
     setOriginalUrl('');
     setSelectedFile(null);
     setPreviewUrl(null);
-    setUploadProgress(0); // For file upload
     setTags([]);
     setTitle('');
     setDescription('');
@@ -297,6 +303,30 @@ export function Upload() {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Upload Success Overlay */}
+      {uploadOverlayVisible && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 rounded-2xl">
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg text-center max-w-md mx-4">
+            <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
+              Datei erfolgreich übertragen
+            </h3>
+            <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+              Starte Transkodierung.
+            </p>
+            <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+              Sie können das Fenster schließen und warten.
+            </p>
+            <button
+              onClick={() => setUploadOverlayVisible(false)}
+              className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
+            >
+              Schließen
+            </button>
           </div>
         </div>
       )}
@@ -409,42 +439,40 @@ export function Upload() {
               <div className="space-y-6">
                 {/* Video Preview / Thumbnail */}
                 {(previewUrl || (fetchedMetadata && fetchedMetadata.thumbnail)) && (
-                  <div className="relative aspect-video rounded-lg overflow-hidden bg-cyber-primary/5 group">
+                  <div className="relative aspect-video rounded-lg overflow-hidden bg-cyber-primary/5 group flex items-center justify-center">
                     {previewUrl ? (
-                      <video
-                        src={previewUrl}
-                        className="w-full h-full object-cover"
-                        controls
-                      />
+                      isFormatSupportedForPreview ? (
+                        <VideoJS
+                          options={{
+                            autoplay: false,
+                            controls: true,
+                            responsive: true,
+                            fluid: true,
+                            sources: [{
+                              src: previewUrl || '',
+                              type: selectedFile?.type || 'video/mp4' // Use selected file type or default
+                            }]
+                          }}
+                        />
+                      ) : (
+                        <div className="text-center text-cyber-text-light/60 dark:text-white/60 p-4">
+                          <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                          <p>Dieses Videoformat wird von Ihrem Browser für die Vorschau möglicherweise nicht unterstützt. Es wird nach dem Hochladen verarbeitet.</p>
+                        </div>
+                      )
                     ) : (
-                      <img
-                        src={fetchedMetadata.thumbnail}
-                        alt="Video Vorschau"
-                        className="w-full h-full object-cover"
-                      />
+                      fetchedMetadata && fetchedMetadata.thumbnail && (
+                        <img
+                          src={fetchedMetadata.thumbnail}
+                          alt="Video Vorschau"
+                          className="w-full h-full object-cover"
+                        />
+                      )
                     )}
                   </div>
                 )}
                 
-                {/* Upload Progress for File Upload */}
-                {selectedFile && (
-                  <div className="relative pt-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
-                        Upload Fortschritt
-                      </span>
-                      <span className="text-sm font-medium text-cyber-primary">
-                        {uploadProgress}%
-                      </span>
-                    </div>
-                    <div className="overflow-hidden h-2 rounded-full bg-cyber-primary/10">
-                      <div
-                        style={{ width: `${uploadProgress}%` }}
-                        className="h-full bg-cyber-primary transition-all duration-300 rounded-full relative overflow-hidden"
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Upload Progress for File Upload - Removed */}
 
                 {/* Metadata Fields (Title, Description, Category, Tags, Visibility) */}
                 <div className="space-y-2">
@@ -553,7 +581,6 @@ export function Upload() {
                 
                 <div className="flex items-center gap-2 text-cyber-text-light/60 dark:text-white/60 text-sm mt-8">
                   <AlertCircle className="w-4 h-4" />
-                  <span>Maximale Dateigröße: 500MB</span>
                 </div>
               </div>
               
@@ -588,19 +615,29 @@ export function Upload() {
                     </span>
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={handleUpload}
-                    disabled={isLoading || !selectedFile}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                  <>
+                    {uploadSuccess ? (
+                      <div className="mb-4 flex flex-col gap-1 text-sm text-cyber-text-light/80 dark:text-white/80">
+                        <p>Datei erfolgreich übertragen.</p>
+                        <p>Starte Transkodierung.</p>
+                        <p>Sie können das Fenster schließen und warten.</p>
+                      </div>
                     ) : (
-                      <UploadIcon className="w-5 h-5" />
+                      <button
+                        type="button"
+                        className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={handleUpload}
+                        disabled={isLoading || !selectedFile}
+                      >
+                        {isLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <UploadIcon className="w-5 h-5" />
+                        )}
+                        <span>{isLoading ? 'Wird hochgeladen...' : 'Video hochladen'}</span>
+                      </button>
                     )}
-                    <span>{isLoading ? 'Wird hochgeladen...' : 'Video hochladen'}</span>
-                  </button>
+                  </>
                 )}
               </div>
             </div>
