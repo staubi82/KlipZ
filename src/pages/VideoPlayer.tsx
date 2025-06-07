@@ -39,6 +39,10 @@ export function VideoPlayer() {
         setVideo(current);
         setRecommended(all.filter((v: any) => v.id !== videoId));
       })
+      .then(() => {
+        // Scroll to the top of the page after video data is loaded
+        window.scrollTo(0, 0);
+      })
       .catch(err => console.error('Fehler beim Laden', err));
   }, [videoId]);
 
