@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Mail, User as UserIcon, Save, Film, Eye, Lock, Activity, Pencil, Trash2 } from 'lucide-react';
+import { Camera, Mail, User as UserIcon, Save, Film, Eye, Lock, Activity, Pencil, Trash2, Plus, Tag } from 'lucide-react';
 export function Profile() {
   const [username, setUsername] = useState('CyberCreator');
   const [email, setEmail] = useState('cybercreator@example.com');
@@ -28,8 +28,13 @@ export function Profile() {
     category: '', // Kategorie hinzugefügt
     tags: '', // Tags als String für das Eingabefeld hinzugefügt
   });
- 
- 
+
+  // State für Kategorie-Management
+  const [categories, setCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [categoryMessage, setCategoryMessage] = useState('');
+
   useEffect(() => {
     // Load profile data from API on mount
     fetch('/api/profile')
@@ -50,6 +55,18 @@ export function Profile() {
       .then(setVideos)
       .catch(() => {
         setMessage('Fehler beim Laden der Videos');
+      });
+
+    // Load categories from API
+    fetch('/api/categories')
+      .then((res) => res.json())
+      .then((data) => {
+        // Extract names from category objects
+        const categoryNames = data.map((cat: any) => cat.name);
+        setCategories(categoryNames);
+      })
+      .catch(() => {
+        console.log('Keine Kategorien gefunden oder Fehler beim Laden');
       });
   }, []);
 
@@ -131,6 +148,52 @@ export function Profile() {
       .catch(() => {
         setSaveMessage('Fehler beim Speichern des Videos.');
       });
+  };
+
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategory.trim()) return;
+
+    setCategoryMessage('');
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategory.trim() })
+      });
+
+      if (response.ok) {
+        const newCat = await response.json();
+        setCategories([...categories, newCat.name]);
+        setNewCategory('');
+        setIsAddingCategory(false);
+        setCategoryMessage('Kategorie erfolgreich hinzugefügt');
+      } else {
+        setCategoryMessage('Fehler beim Hinzufügen der Kategorie');
+      }
+    } catch (error) {
+      setCategoryMessage('Fehler beim Hinzufügen der Kategorie');
+    }
+  };
+
+  const handleDeleteCategory = async (categoryName: string) => {
+    if (window.confirm(`Bist du sicher, dass du die Kategorie "${categoryName}" löschen möchtest?`)) {
+      setCategoryMessage('');
+      try {
+        const response = await fetch(`/api/categories/${encodeURIComponent(categoryName)}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          setCategories(categories.filter(cat => cat !== categoryName));
+          setCategoryMessage('Kategorie erfolgreich gelöscht');
+        } else {
+          setCategoryMessage('Fehler beim Löschen der Kategorie');
+        }
+      } catch (error) {
+        setCategoryMessage('Fehler beim Löschen der Kategorie');
+      }
+    }
   };
 
   const [avatar, setAvatar] = React.useState('');
@@ -388,6 +451,115 @@ export function Profile() {
             </div>
             <p className="text-cyber-text-light/60 dark:text-white/60">Keine Aktivitäten vorhanden.</p>
           </div>
+
+          {/* Kategorie-Management */}
+          <div className="rounded-xl border border-cyber-primary/20 bg-white/80 dark:bg-gray-800/80 p-6">
+            <div className="flex items-center space-x-4 mb-6">
+              <div className="p-3 rounded-lg bg-cyber-primary/10">
+                <Tag className="w-6 h-6 text-cyber-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-cyber-text-light dark:text-white">Kategorien</h3>
+                <p className="text-cyber-text-light/60 dark:text-white/60">Eigene Kategorien verwalten</p>
+              </div>
+            </div>
+
+            {/* Kategorie hinzufügen Button */}
+            {!isAddingCategory && (
+              <button
+                onClick={() => setIsAddingCategory(true)}
+                className="w-full flex items-center justify-center space-x-2 py-3 px-6 bg-cyber-primary/10 text-cyber-primary dark:text-white rounded-lg hover:bg-cyber-primary/20 transition-colors mb-4"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Neue Kategorie hinzufügen</span>
+              </button>
+            )}
+
+            {/* Kategorie hinzufügen Form */}
+            {isAddingCategory && (
+              <form onSubmit={handleAddCategory} className="space-y-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-cyber-text-light/80 dark:text-white/80 mb-2">
+                    Kategorie-Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="z.B. Gaming, Tutorials, Musik..."
+                    className="w-full bg-white dark:bg-gray-700 border border-cyber-primary/30 rounded-lg py-2 px-4 text-cyber-text-light dark:text-white placeholder-cyber-text-light/50 dark:placeholder-white/50 focus:outline-none focus:border-cyber-primary focus:ring-1 focus:ring-cyber-primary transition-all"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    type="submit"
+                    className="flex-1 flex items-center justify-center space-x-2 py-2 px-4 bg-cyber-primary text-white rounded-lg hover:bg-cyber-primary/80 transition-colors"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Speichern</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingCategory(false);
+                      setNewCategory('');
+                    }}
+                    className="flex-1 py-2 px-4 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-white rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Kategorien Liste */}
+            <div className="space-y-2">
+              {categories.length === 0 ? (
+                <p className="text-cyber-text-light/60 dark:text-white/60 text-sm">
+                  Noch keine Kategorien erstellt.
+                </p>
+              ) : (
+                categories.map((category) => {
+                  const categoryVideos = videos.filter(video => video.category === category);
+                  return (
+                    <div
+                      key={category}
+                      className="flex items-center justify-between p-3 rounded-lg bg-cyber-primary/5 hover:bg-cyber-primary/10 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 rounded-full bg-cyber-primary"></div>
+                        <span className="text-cyber-text-light dark:text-white font-medium">
+                          {category}
+                        </span>
+                        <span className="text-cyber-text-light/60 dark:text-white/60 text-sm">
+                          ({categoryVideos.length} Video{categoryVideos.length !== 1 ? 's' : ''})
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteCategory(category)}
+                        className="text-red-600 hover:text-red-800 transition-colors p-1"
+                        title="Kategorie löschen"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Kategorie-Nachrichten */}
+            {categoryMessage && (
+              <p className={`mt-4 text-center text-sm font-medium ${
+                categoryMessage.includes('erfolgreich')
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-red-600 dark:text-red-400'
+              }`}>
+                {categoryMessage}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -463,12 +635,18 @@ export function Profile() {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-cyber-text-light/80 dark:text-white/80 mb-1">Kategorie</label>
-                          <input
-                            type="text"
+                          <select
                             value={editFormData.category}
                             onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
                             className="w-full bg-white dark:bg-gray-700 border border-cyber-primary/30 rounded-lg py-1 px-3 text-cyber-text-light dark:text-white focus:outline-none focus:border-cyber-primary focus:ring-1 focus:ring-cyber-primary transition-all"
-                          />
+                          >
+                            <option value="alle">alle</option>
+                            {categories.map((category) => (
+                              <option key={category} value={category}>
+                                {category}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-cyber-text-light/80 dark:text-white/80 mb-1">Tags (Komma-getrennt)</label>

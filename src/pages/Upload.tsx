@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Upload as UploadIcon, Link as LinkIcon, Loader2, X, Film, AlertCircle, ArrowRight, CheckCircle2, Globe, Lock as LockIcon } from 'lucide-react';
 import { VideoJS } from '../components/VideoJS'; // Import VideoJS component
 
@@ -27,16 +28,19 @@ export function Upload() {
 
   const API_BASE = 'http://localhost:3301';
 
-  const categories = [
-    'Gaming',
-    'Musik',
-    'Sport',
-    'Bildung',
-    'Unterhaltung',
-    'Nachrichten',
-    'Tech',
-    'Lifestyle'
-  ];
+  const [userCategories, setUserCategories] = useState<string[]>([]);
+
+  // Load user categories on component mount
+  useEffect(() => {
+    fetch(`${API_BASE}/api/categories`)
+      .then(res => res.json())
+      .then(data => {
+        // Extract category names from API response objects
+        const categoryNames = data.map((cat: any) => cat.name);
+        setUserCategories(categoryNames);
+      })
+      .catch(err => console.log('Keine Kategorien gefunden oder Fehler beim Laden'));
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,10 +88,10 @@ export function Upload() {
       formData.append('title', title);
       formData.append('description', description);
       formData.append('transcode', transcode.toString()); // Send transcode option
-      // Add category, tags, and visibility if your backend supports it
-      // formData.append('category', category);
-      // formData.append('tags', JSON.stringify(tags)); // Assuming backend expects JSON string
-      // formData.append('isPublic', isPublic.toString());
+      // Add category, tags, and visibility
+      formData.append('category', category || 'alle'); // Default to 'alle' if no category selected
+      formData.append('tags', JSON.stringify(tags)); // Send tags as JSON string
+      formData.append('isPublic', isPublic.toString());
 
       const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Upload fehlgeschlagen');
@@ -550,11 +554,16 @@ export function Upload() {
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white focus:outline-none focus:border-cyber-primary transition-all"
                   >
-                    <option value="">Kategorie wählen...</option>
-                    {categories.map((cat) => (
+                    <option value="">Alle (Standard)</option>
+                    {userCategories.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
+                  {userCategories.length === 0 && (
+                    <p className="text-sm text-cyber-text-light/60 dark:text-white/60 mt-1">
+                      Keine Kategorien vorhanden. <Link to="/profile" className="text-cyber-primary hover:underline">Erstelle deine erste Kategorie</Link> in deinem Profil.
+                    </p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">

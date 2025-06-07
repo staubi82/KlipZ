@@ -40,6 +40,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS profile(
   email TEXT,
   bio TEXT
 );`);
+
+// Create categories table
+db.exec(`CREATE TABLE IF NOT EXISTS categories(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
 // API routes for profile management
 // Migration to add avatar column if it does not exist
 try {
@@ -77,6 +84,93 @@ app.post('/api/profile', (req, res) => {
   }
   res.json({ message: 'Profil gespeichert' });
 });
+
+// API routes for category management
+app.get('/api/categories', (req, res) => {
+  try {
+    const categories = db.prepare('SELECT name FROM categories ORDER BY name').all();
+    res.json(categories);
+  } catch (err) {
+    console.error('Fehler beim Abrufen der Kategorien:', err);
+    res.status(500).json({ message: 'Fehler beim Abrufen der Kategorien', error: err.message });
+  }
+});
+
+app.post('/api/categories', (req, res) => {
+  const { name } = req.body;
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ message: 'Kategoriename ist erforderlich.' });
+  }
+
+  const trimmedName = name.trim();
+  
+  try {
+    const stmt = db.prepare('INSERT INTO categories (name) VALUES (?)');
+    stmt.run(trimmedName);
+    res.json({ message: 'Kategorie erfolgreich erstellt', name: trimmedName });
+  } catch (err) {
+    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      res.status(400).json({ message: 'Eine Kategorie mit diesem Namen existiert bereits.' });
+    } else {
+      console.error('Fehler beim Erstellen der Kategorie:', err);
+      res.status(500).json({ message: 'Fehler beim Erstellen der Kategorie', error: err.message });
+    }
+  }
+});
+
+app.delete('/api/categories/:name', (req, res) => {
+  const { name } = req.params;
+  
+  try {
+    // First, update all videos with this category to have empty category
+    const updateStmt = db.prepare('UPDATE videos SET category = "" WHERE category = ?');
+    updateStmt.run(name);
+    
+    // Then delete the category
+    const deleteStmt = db.prepare('DELETE FROM categories WHERE name = ?');
+    const result = deleteStmt.run(name);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ message: 'Kategorie nicht gefunden.' });
+    }
+    
+    res.json({ message: 'Kategorie erfolgreich gelöscht' });
+  } catch (err) {
+    console.error('Fehler beim Löschen der Kategorie:', err);
+    res.status(500).json({ message: 'Fehler beim Löschen der Kategorie', error: err.message });
+  }
+});
+
+// Get categories with video counts
+app.get('/api/categories/counts', (req, res) => {
+  try {
+    // Get total video count
+    const totalCount = db.prepare('SELECT COUNT(*) as count FROM videos').get().count;
+    
+    // Get categories with their video counts
+    const categoryCounts = db.prepare(`
+      SELECT
+        c.name,
+        COUNT(v.id) as count
+      FROM categories c
+      LEFT JOIN videos v ON c.name = v.category
+      GROUP BY c.name
+      ORDER BY c.name
+    `).all();
+    
+    // Add "Alle" category with total count
+    const result = [
+      { name: 'Alle', count: totalCount },
+      ...categoryCounts
+    ];
+    
+    res.json(result);
+  } catch (err) {
+    console.error('Fehler beim Abrufen der Kategorie-Counts:', err);
+    res.status(500).json({ message: 'Fehler beim Abrufen der Kategorie-Counts', error: err.message });
+  }
+});
+
 // Note: If the database file already exists, you might need to manually alter the table
 // or delete the videos.db file to apply the new schema in a development environment.
 // In a production environment, a proper database migration strategy would be required.
@@ -343,12 +437,31 @@ app.post('/api/import-url', async (req, res) => {
 });
 
 app.get('/api/videos', (req, res) => {
-  console.log('Fetching videos from database...'); // Log before fetching
+  // console.log('Fetching videos from database...'); // Log before fetching
+  const { category } = req.query;
+  
   try {
-    const rows = db.prepare('SELECT id, title, description, thumbnail, duration, created_at FROM videos ORDER BY created_at DESC').all();
-    console.log('Successfully fetched videos:', rows.length); // Log number of videos fetched
-    console.log('Fetched video data (first 5):', rows.slice(0, 5)); // Log first 5 videos
-    res.json(rows);
+    let query = 'SELECT id, title, description, thumbnail, filepath, duration, category, created_at FROM videos';
+    let params = [];
+    
+    if (category && category !== 'Alle') {
+      query += ' WHERE category = ?';
+      params.push(category);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const rows = db.prepare(query).all(...params);
+    // console.log('Successfully fetched videos:', rows.length); // Log number of videos fetched
+    // console.log('Fetched video data (first 5):', rows.slice(0, 5)); // Log first 5 videos
+  
+    // Erweitere die Daten um videoUrl basierend auf filepath
+    const videosWithUrl = rows.map(video => ({
+      ...video,
+      videoUrl: video.filepath ? `/uploads/${video.filepath.split('/').pop()}` : ''
+    }));
+
+    res.json(videosWithUrl);
   } catch (err) {
     console.error('Error fetching videos:', err); // Log any errors
     res.status(500).json({ message: 'Fehler beim Abrufen der Videos', error: err.message });
@@ -418,6 +531,89 @@ app.get('/api/videos/:id', (req, res) => {
       file.pipe(res);
     }
   });
+});
+// PUT endpoint to update video metadata
+app.put('/api/videos/:id', (req, res) => {
+  const { id } = req.params;
+  const { title, description, category, tags } = req.body;
+  
+  try {
+    // Prepare the update statement
+    const stmt = db.prepare(`
+      UPDATE videos 
+      SET title = ?, description = ?, category = ?, tags = ? 
+      WHERE id = ?
+    `);
+    
+    // Convert tags array to JSON string for storage
+    const tagsJson = Array.isArray(tags) ? JSON.stringify(tags) : tags;
+    
+    // Execute the update
+    const result = stmt.run(title, description, category || '', tagsJson, id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Video nicht gefunden' });
+    }
+    
+    console.log(`Video ${id} erfolgreich aktualisiert`);
+    res.json({ 
+      success: true, 
+      message: 'Video erfolgreich aktualisiert',
+      changes: result.changes 
+    });
+    
+// DELETE endpoint to delete a video
+app.delete('/api/videos/:id', (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    // First, get the video info to delete associated files
+    const video = db.prepare('SELECT * FROM videos WHERE id = ?').get(id);
+    
+    if (!video) {
+      return res.status(404).json({ error: 'Video nicht gefunden' });
+    }
+    
+    // Delete the video from database
+    const stmt = db.prepare('DELETE FROM videos WHERE id = ?');
+    const result = stmt.run(id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Video nicht gefunden' });
+    }
+    
+    // Optionally delete the actual video file and thumbnail
+    // (You might want to keep files for backup or implement this later)
+    /*
+    try {
+      if (video.filepath && fs.existsSync(video.filepath)) {
+        fs.unlinkSync(video.filepath);
+      }
+      if (video.thumbnail && fs.existsSync(video.thumbnail)) {
+        fs.unlinkSync(video.thumbnail);
+      }
+    } catch (fileError) {
+      console.warn('Warnung: Konnte Dateien nicht löschen:', fileError);
+      // Continue anyway, database deletion was successful
+    }
+    */
+    
+    console.log(`Video ${id} erfolgreich gelöscht`);
+    res.json({ 
+      success: true, 
+      message: 'Video erfolgreich gelöscht',
+      deletedId: id 
+    });
+    
+  } catch (error) {
+    console.error('Fehler beim Löschen des Videos:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Videos' });
+  }
+});
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren des Videos:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Videos' });
+  }
 });
 
 const downloadFromUrl = (url, baseDir, importId) => {

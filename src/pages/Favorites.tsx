@@ -1,12 +1,40 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { useVideoStore } from '../hooks/useVideoStore';
-import { sampleVideos } from '../data/sampleVideos';
+
+interface VideoItem {
+  id: number;
+  title: string;
+  description: string;
+  thumbnail: string;
+  videoUrl: string;
+  duration: number;
+  created_at?: string;
+  category?: string;
+}
 
 export function Favorites() {
   const { favorites } = useVideoStore();
-  const favoriteVideos = sampleVideos.filter(video => favorites.includes(video.id));
+  const [allVideos, setAllVideos] = useState<VideoItem[]>([]);
+  const [favoriteVideos, setFavoriteVideos] = useState<VideoItem[]>([]);
+  const API_BASE = 'http://localhost:3301';
+
+  useEffect(() => {
+    // Videos vom Server laden
+    fetch(`${API_BASE}/api/videos`)
+      .then(res => res.json())
+      .then((videos) => {
+        setAllVideos(videos);
+      })
+      .catch(err => console.error('Fehler beim Laden der Videos:', err));
+  }, []);
+
+  useEffect(() => {
+    // Favoriten-Videos filtern
+    const filteredFavorites = allVideos.filter(video => favorites.includes(video.id));
+    setFavoriteVideos(filteredFavorites);
+  }, [allVideos, favorites]);
 
   return (
     <div className="space-y-8 relative">
@@ -35,7 +63,7 @@ export function Favorites() {
             >
               <div className="relative aspect-video rounded-xl border border-cyber-primary/20 bg-cyber-muted/30 backdrop-blur-xl overflow-hidden transition-all duration-300 group-hover:border-cyber-primary/40">
                 <img
-                  src={video.thumbnail}
+                  src={`${API_BASE}${video.thumbnail}`}
                   alt={video.title}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
@@ -45,7 +73,8 @@ export function Favorites() {
                     {video.title}
                   </h3>
                   <p className="text-sm text-white/80">
-                    {video.views.toLocaleString()} Views • {video.uploadDate}
+                    {video.created_at ? new Date(video.created_at).toLocaleDateString('de-DE') : 'Unbekannt'}
+                    {video.category && ` • ${video.category}`}
                   </p>
                 </div>
                 <div className="absolute top-2 right-2">

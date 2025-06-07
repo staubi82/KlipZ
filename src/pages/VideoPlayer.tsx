@@ -86,6 +86,20 @@ export function VideoPlayer() {
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* Favoriten Button */}
+            <button
+              onClick={() => toggleFavorite(videoId)}
+              className={`p-3 rounded-xl transition-all flex items-center gap-2 ${
+                isFavorite(videoId)
+                  ? 'bg-cyber-primary text-white'
+                  : 'bg-cyber-primary/10 text-cyber-text-light dark:text-white hover:bg-cyber-primary/20'
+              }`}
+              title={isFavorite(videoId) ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
+            >
+              <Star className={`w-5 h-5 ${isFavorite(videoId) ? 'fill-current' : ''}`} />
+              {isFavorite(videoId) ? 'Favorit' : 'Favorit'}
+            </button>
+            
             <div className="relative">
               <button
                 onClick={() => setIsShareOpen(!isShareOpen)}
