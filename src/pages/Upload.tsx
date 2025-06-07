@@ -14,6 +14,7 @@ export function Upload() {
   const [isPublic, setIsPublic] = useState(true);
   const [category, setCategory] = useState('');
   const [isFormatSupportedForPreview, setIsFormatSupportedForPreview] = useState(true); // New state
+  const [transcode, setTranscode] = useState(false); // New state for transcode option
 
   // State for URL import
   const [fetchedMetadata, setFetchedMetadata] = useState<any>(null);
@@ -68,18 +69,21 @@ export function Upload() {
     }
   };
 
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [uploadOverlayVisible, setUploadOverlayVisible] = useState(false);
+  const [fileUploadStatus, setFileUploadStatus] = useState<'idle' | 'uploading' | 'uploaded' | 'error'>('idle');
 
   const handleUpload = async () => {
     if (!selectedFile) return;
-    setIsLoading(true);
-    setUploadSuccess(false);
+
+    // Show uploading status immediately
+    setFileUploadStatus('uploading');
+    setIsLoading(true); // Keep isLoading for general loading indication if needed elsewhere
+
     try {
       const formData = new FormData();
       formData.append('video', selectedFile);
       formData.append('title', title);
       formData.append('description', description);
+      formData.append('transcode', transcode.toString()); // Send transcode option
       // Add category, tags, and visibility if your backend supports it
       // formData.append('category', category);
       // formData.append('tags', JSON.stringify(tags)); // Assuming backend expects JSON string
@@ -88,8 +92,8 @@ export function Upload() {
       const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Upload fehlgeschlagen');
       
-      setUploadSuccess(true);
-      setUploadOverlayVisible(true);
+      // Set status to uploaded after successful fetch response
+      setFileUploadStatus('uploaded');
       // Reset form after successful upload
       setSelectedFile(null);
       setPreviewUrl(null);
@@ -101,6 +105,7 @@ export function Upload() {
 
     } catch (err) {
       console.error('Fehler beim Upload:', err);
+      setFileUploadStatus('error');
       // Optionally show an error message to the user
     } finally {
       setIsLoading(false);
@@ -307,26 +312,58 @@ export function Upload() {
         </div>
       )}
 
-      {/* Upload Success Overlay */}
-      {uploadOverlayVisible && (
+      {/* File Upload Status Overlay */}
+      {fileUploadStatus !== 'idle' && (
         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 rounded-2xl">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg text-center max-w-md mx-4">
-            <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
-              Datei erfolgreich übertragen
-            </h3>
-            <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
-              Starte Transkodierung.
-            </p>
-            <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
-              Sie können das Fenster schließen und warten.
-            </p>
-            <button
-              onClick={() => setUploadOverlayVisible(false)}
-              className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
-            >
-              Schließen
-            </button>
+            {fileUploadStatus === 'uploading' && (
+              <>
+                <Loader2 className="w-12 h-12 text-cyber-primary animate-spin mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
+                  Lade Video hoch...
+                </h3>
+                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+                  Bitte warten Sie, während Ihre Datei übertragen wird.
+                </p>
+              </>
+            )}
+            {fileUploadStatus === 'uploaded' && (
+              <>
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
+                  Datei erfolgreich hochgeladen
+                </h3>
+                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+                  Die Transkodierung startet jetzt im Hintergrund.
+                </p>
+                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+                  Das Transkodieren kann einige Zeit dauern. Sie können dieses Fenster schließen und die Liste der Videos überprüfen, sobald es fertig ist.
+                </p>
+                <button
+                  onClick={() => setFileUploadStatus('idle')} // Close overlay
+                  className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
+                >
+                  Schließen
+                </button>
+              </>
+            )}
+            {fileUploadStatus === 'error' && (
+              <>
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
+                  Upload fehlgeschlagen
+                </h3>
+                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+                  Es gab einen Fehler beim Hochladen Ihrer Datei. Bitte versuchen Sie es erneut.
+                </p>
+                <button
+                  onClick={() => setFileUploadStatus('idle')} // Close overlay
+                  className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
+                >
+                  Schließen
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -441,7 +478,7 @@ export function Upload() {
                 {(previewUrl || (fetchedMetadata && fetchedMetadata.thumbnail)) && (
                   <div className="relative aspect-video rounded-lg overflow-hidden bg-cyber-primary/5 group flex items-center justify-center">
                     {previewUrl ? (
-                      isFormatSupportedForPreview ? (
+                      <>
                         <VideoJS
                           options={{
                             autoplay: false,
@@ -454,12 +491,15 @@ export function Upload() {
                             }]
                           }}
                         />
-                      ) : (
-                        <div className="text-center text-cyber-text-light/60 dark:text-white/60 p-4">
-                          <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-                          <p>Dieses Videoformat wird von Ihrem Browser für die Vorschau möglicherweise nicht unterstützt. Es wird nach dem Hochladen verarbeitet.</p>
-                        </div>
-                      )
+                        {!isFormatSupportedForPreview && (
+                          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+                            <div className="text-center text-white p-4 bg-black bg-opacity-70 rounded-lg">
+                              <AlertCircle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+                              <p>Dieses Videoformat wird von Ihrem Browser für die Vorschau möglicherweise nicht unterstützt. Es wird nach dem Hochladen verarbeitet.</p>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       fetchedMetadata && fetchedMetadata.thumbnail && (
                         <img
@@ -579,6 +619,20 @@ export function Upload() {
                   </div>
                 </div>
                 
+                {/* Transcode Option */}
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="transcode-checkbox"
+                    checked={transcode}
+                    onChange={(e) => setTranscode(e.target.checked)}
+                    className="form-checkbox h-5 w-5 text-cyber-primary rounded border-cyber-primary/30 focus:ring-cyber-primary dark:bg-gray-700 dark:border-gray-600 dark:checked:bg-cyber-primary dark:checked:border-transparent"
+                  />
+                  <label htmlFor="transcode-checkbox" className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
+                    Video transkodieren (empfohlen für bessere Kompatibilität)
+                  </label>
+                </div>
+
                 <div className="flex items-center gap-2 text-cyber-text-light/60 dark:text-white/60 text-sm mt-8">
                   <AlertCircle className="w-4 h-4" />
                 </div>
@@ -616,25 +670,25 @@ export function Upload() {
                   </button>
                 ) : (
                   <>
-                    {uploadSuccess ? (
-                      <div className="mb-4 flex flex-col gap-1 text-sm text-cyber-text-light/80 dark:text-white/80">
+                    {fileUploadStatus === 'uploaded' ? (
+                       <div className="mb-4 flex flex-col gap-1 text-sm text-cyber-text-light/80 dark:text-white/80">
                         <p>Datei erfolgreich übertragen.</p>
                         <p>Starte Transkodierung.</p>
-                        <p>Sie können das Fenster schließen und warten.</p>
+                        <p>Das Transkodieren kann einige Zeit dauern. Sie können dieses Fenster schließen und die Liste der Videos überprüfen, sobald es fertig ist.</p>
                       </div>
                     ) : (
                       <button
                         type="button"
                         className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={handleUpload}
-                        disabled={isLoading || !selectedFile}
+                        disabled={fileUploadStatus === 'uploading' || !selectedFile}
                       >
-                        {isLoading ? (
+                        {fileUploadStatus === 'uploading' ? (
                           <Loader2 className="w-5 h-5 animate-spin" />
                         ) : (
                           <UploadIcon className="w-5 h-5" />
                         )}
-                        <span>{isLoading ? 'Wird hochgeladen...' : 'Video hochladen'}</span>
+                        <span>{fileUploadStatus === 'uploading' ? 'Wird hochgeladen...' : 'Video hochladen'}</span>
                       </button>
                     )}
                   </>

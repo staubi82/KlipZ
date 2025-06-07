@@ -27,6 +27,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS videos(
   filepath TEXT,
   thumbnail TEXT,
   duration REAL,
+  mime_type TEXT, -- Added mime_type column
   category TEXT, -- Added category column
   tags TEXT, -- Added tags column (will store as JSON string)
   is_public INTEGER DEFAULT 1, -- Added is_public column (1 for public, 0 for private)
@@ -43,6 +44,12 @@ db.exec(`CREATE TABLE IF NOT EXISTS profile(
 // Migration to add avatar column if it does not exist
 try {
   db.prepare("ALTER TABLE profile ADD COLUMN avatar TEXT").run();
+} catch (e) {
+  // Ignore error if column already exists
+}
+// Migration to add mime_type column to videos table if it does not exist
+try {
+  db.prepare("ALTER TABLE videos ADD COLUMN mime_type TEXT").run();
 } catch (e) {
   // Ignore error if column already exists
 }
@@ -94,10 +101,14 @@ const upload = multer({ storage });
 app.post('/api/upload', upload.single('video'), async (req, res) => {
   const tempFilePath = req.file ? req.file.path : null;
   const tempDir = req.file ? path.dirname(req.file.path) : null;
+  // Get the transcode option from the request body, default to true
+  const transcode = req.body.transcode === 'true'; // FormData sends values as strings
 
   if (!tempFilePath || !tempDir) {
     return res.status(400).json({ message: 'Keine Datei angegeben.' });
   }
+
+  let finalFilePath = tempFilePath; // Start with the temporary file path
 
   try {
     // Generate a unique filename for the permanent location
@@ -107,11 +118,12 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
 
     // Move the file from the temporary directory to the permanent upload directory
     fs.renameSync(tempFilePath, permanentFilePath);
+    finalFilePath = permanentFilePath; // Update finalFilePath to the permanent location
 
     // Prüfe, ob Datei existiert und gib Dateigröße aus
-    const fileExists = fs.existsSync(permanentFilePath);
-    const fileSize = fileExists ? fs.statSync(permanentFilePath).size : 0;
-    console.log(`Datei existiert: ${fileExists}, Größe: ${fileSize} Bytes, Pfad: ${permanentFilePath}`);
+    const fileExists = fs.existsSync(finalFilePath);
+    const fileSize = fileExists ? fs.statSync(finalFilePath).size : 0;
+    console.log(`Datei existiert: ${fileExists}, Größe: ${fileSize} Bytes, Pfad: ${finalFilePath}`);
 
     if (!fileExists || fileSize === 0) {
       // Clean up the temporary directory on error
@@ -121,43 +133,54 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
       return res.status(400).json({ message: 'Videodatei existiert nicht oder ist leer nach Verschieben.' });
     }
 
-    // Transkodieren Sie das Video
-    console.log(`Starte Transkodierung für: ${permanentFilePath}`);
-    const transcodedFilePath = await transcodeVideo(permanentFilePath, uploadDir);
-    console.log(`Transkodierung abgeschlossen. Transkodierte Datei: ${transcodedFilePath}`);
+    let videoToProcessPath = finalFilePath; // Path to the video file that will be processed
+    let mimeType = req.file.mimetype; // Store original mime type
 
-    // Überprüfen Sie die transkodierte Datei
-    const transcodedFileExists = fs.existsSync(transcodedFilePath);
-    const transcodedFileSize = transcodedFileExists ? fs.statSync(transcodedFilePath).size : 0;
-    console.log(`Transkodierte Datei existiert: ${transcodedFileExists}, Größe: ${transcodedFileSize} Bytes, Pfad: ${transcodedFilePath}`);
+    if (transcode) {
+      // Transkodieren Sie das Video
+      console.log(`Starte Transkodierung für: ${finalFilePath}`);
+      const transcodedFilePath = await transcodeVideo(finalFilePath, uploadDir);
+      console.log(`Transkodierung abgeschlossen. Transkodierte Datei: ${transcodedFilePath}`);
 
-    if (!transcodedFileExists || transcodedFileSize === 0) {
-       // Clean up the temporary directory on error
-       fs.rmdir(tempDir, { recursive: true }, (err) => {
-         if (err) console.error('Fehler beim Löschen des temporären Verzeichnisses nach Transkodierungsfehler:', err);
-       });
-       // Löschen Sie die permanente Datei, wenn die Transkodierung fehlschlägt
-       if (permanentFilePath && fs.existsSync(permanentFilePath)) {
-          fs.unlink(permanentFilePath, (unlinkErr) => {
-            if (unlinkErr) console.error('Fehler beim Löschen der ursprünglichen Datei nach Transkodierungsfehler:', unlinkErr);
-          });
-       }
-       return res.status(500).json({ message: 'Transkodierte Videodatei existiert nicht oder ist leer.' });
+      // Überprüfen Sie die transkodierte Datei
+      const transcodedFileExists = fs.existsSync(transcodedFilePath);
+      const transcodedFileSize = transcodedFileExists ? fs.statSync(transcodedFilePath).size : 0;
+      console.log(`Transkodierte Datei existiert: ${transcodedFileExists}, Größe: ${transcodedFileSize} Bytes, Pfad: ${transcodedFilePath}`);
+
+      if (!transcodedFileExists || transcodedFileSize === 0) {
+         // Clean up the temporary directory on error
+         fs.rmdir(tempDir, { recursive: true }, (err) => {
+           if (err) console.error('Fehler beim Löschen des temporären Verzeichnisses nach Transkodierungsfehler:', err);
+         });
+         // Löschen Sie die permanente Datei, wenn die Transkodierung fehlschlägt
+         if (finalFilePath && fs.existsSync(finalFilePath)) {
+            fs.unlink(finalFilePath, (unlinkErr) => {
+              if (unlinkErr) console.error('Fehler beim Löschen der ursprünglichen Datei nach Transkodierungsfehler:', unlinkErr);
+            });
+         }
+         return res.status(500).json({ message: 'Transkodierte Videodatei existiert nicht oder ist leer.' });
+      }
+
+      // Löschen Sie die ursprüngliche hochgeladene Datei nach der Transkodierung
+      fs.unlink(finalFilePath, (err) => {
+        if (err) console.error('Fehler beim Löschen der ursprünglichen Datei nach Transkodierung:', err);
+      });
+
+      videoToProcessPath = transcodedFilePath; // Use the transcoded file for further processing
+      mimeType = 'video/mp4'; // Transcoded videos are always MP4
+    } else {
+      console.log(`Transkodierung übersprungen für: ${finalFilePath}`);
+      // No transcoding, use the original file and its mime type
     }
 
-    // Löschen Sie die ursprüngliche hochgeladene Datei nach der Transkodierung
-    fs.unlink(permanentFilePath, (err) => {
-      if (err) console.error('Fehler beim Löschen der ursprünglichen Datei nach Transkodierung:', err);
-    });
-
-    const thumbPath = await generateThumbnail(transcodedFilePath, thumbDir);
-    const duration = await getDuration(transcodedFilePath);
+    const thumbPath = await generateThumbnail(videoToProcessPath, thumbDir);
+    const duration = await getDuration(videoToProcessPath);
 
     // Speichere nur den relativen Pfad für das Thumbnail
     const relativeThumbPath = path.relative(__dirname, thumbPath).replace(/\\/g, '/');
-    const relativeFilePath = path.relative(__dirname, transcodedFilePath).replace(/\\/g, '/');
+    const relativeFilePath = path.relative(__dirname, videoToProcessPath).replace(/\\/g, '/');
 
-    const stmt = db.prepare('INSERT INTO videos(title, description, filepath, thumbnail, duration, category, tags, is_public) VALUES (?,?,?,?,?,?,?,?)');
+    const stmt = db.prepare('INSERT INTO videos(title, description, filepath, thumbnail, duration, category, tags, is_public, mime_type) VALUES (?,?,?,?,?,?,?,?,?)');
     const info = stmt.run(
       req.body.title || '',
       req.body.description || '',
@@ -166,7 +189,8 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
       duration,
       req.body.category || '', // Get category from body
       JSON.stringify(req.body.tags || []), // Store tags as JSON string
-      req.body.isPublic === false ? 0 : 1 // Store isPublic as integer (1 for true, 0 for false)
+      req.body.isPublic === 'false' ? 0 : 1, // Store isPublic as integer (1 for true, 0 for false)
+      mimeType // Store the determined MIME type
     );
 
     // Clean up the temporary directory after successful upload
@@ -183,25 +207,25 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
         if (cleanupErr) console.error('Fehler beim Löschen des temporären Verzeichnisses nach Fehler:', cleanupErr);
       });
     }
-    // Löschen Sie die permanente Datei, wenn die Transkodierung fehlschlägt
-    if (permanentFilePath && fs.existsSync(permanentFilePath)) {
-       fs.unlink(permanentFilePath, (unlinkErr) => {
-         if (unlinkErr) console.error('Fehler beim Löschen der permanenten Datei nach Transkodierungsfehler:', unlinkErr);
+    // Löschen Sie die permanente Datei, wenn ein Fehler auftritt
+    if (finalFilePath && fs.existsSync(finalFilePath)) {
+       fs.unlink(finalFilePath, (unlinkErr) => {
+         if (unlinkErr) console.error('Fehler beim Löschen der permanenten Datei nach Fehler:', unlinkErr);
        });
     }
-    res.status(500).json({ message: 'Fehler beim Hochladen oder Transkodieren', error: err.message });
+    res.status(500).json({ message: 'Fehler beim Hochladen oder Verarbeiten des Videos', error: err.message });
   }
 });
 
-// Add the new /api/fetch-metadata endpoint
+// Endpoint to fetch video metadata from a URL
 app.post('/api/fetch-metadata', async (req, res) => {
   const { url } = req.body;
   if (!url) {
-    return res.status(400).json({ message: 'URL fehlt' });
+    return res.status(400).json({ message: 'URL ist erforderlich.' });
   }
 
   try {
-    // Use yt-dlp to fetch metadata
+    // Use yt-dlp to get video metadata in JSON format
     const ytdlp = spawn('yt-dlp', ['--dump-json', url]);
     let stdout = '';
     let stderr = '';
@@ -224,136 +248,125 @@ app.post('/api/fetch-metadata', async (req, res) => {
             description: metadata.description,
             thumbnail: metadata.thumbnail,
             duration: metadata.duration,
-            // Add other relevant fields if needed
+            // Add other relevant fields as needed
           };
           res.json(extractedMetadata);
         } catch (parseError) {
           console.error('Fehler beim Parsen der yt-dlp Ausgabe:', parseError);
-          res.status(500).json({ message: 'Fehler beim Verarbeiten der Metadaten', error: parseError.message });
+          res.status(500).json({ message: 'Fehler beim Verarbeiten der Metadaten.', error: parseError.message });
         }
       } else {
-        console.error('yt-dlp Fehler beim Abrufen der Metadaten:', stderr);
-        res.status(500).json({ message: 'Fehler beim Abrufen der Metadaten von der URL', error: stderr });
+        console.error(`yt-dlp Fehler beim Abrufen der Metadaten für ${url}: ${stderr}`);
+        res.status(500).json({ message: 'Fehler beim Abrufen der Metadaten von der URL.', error: stderr });
       }
     });
-
-  } catch (error) {
-    console.error('Serverfehler beim Abrufen der Metadaten:', error);
-    res.status(500).json({ message: 'Interner Serverfehler', error: error.message });
+  } catch (err) {
+    console.error('Serverfehler beim Abrufen der Metadaten:', err);
+    res.status(500).json({ message: 'Interner Serverfehler.', error: err.message });
   }
 });
 
-// GET profile data
-app.get('/api/profile', (req, res) => {
-  const row = db.prepare('SELECT username, email, bio FROM profile WHERE id = 1').get();
-  if (row) {
-    res.json(row);
-  } else {
-    // Return default empty profile if none exists
-    res.json({ username: '', email: '', bio: '' });
-  }
-});
-
-// POST save profile data
-app.post('/api/profile', (req, res) => {
-  try {
-    const { username, email, bio, avatar } = req.body;
-    if (!username || !email) {
-      return res.status(400).json({ message: 'Username und Email sind erforderlich.' });
-    }
-    const exists = db.prepare('SELECT 1 FROM profile WHERE id = 1').get();
-    if (exists) {
-      const stmt = db.prepare('UPDATE profile SET username = ?, email = ?, bio = ?, avatar = ? WHERE id = 1');
-      stmt.run(username, email, bio, avatar);
-    } else {
-      const stmt = db.prepare('INSERT INTO profile (id, username, email, bio, avatar) VALUES (1, ?, ?, ?, ?)');
-      stmt.run(username, email, bio, avatar);
-    }
-    res.json({ message: 'Profil gespeichert' });
-  } catch (error) {
-    console.error('Fehler beim Speichern des Profils:', error);
-    res.status(500).json({ message: 'Interner Serverfehler beim Speichern des Profils' });
-  }
-});
-
-// Add the new /api/import-url endpoint to initiate URL import
+// Endpoint to handle URL import
 app.post('/api/import-url', async (req, res) => {
   const { url, title, description, category, tags, isPublic } = req.body;
-
   if (!url) {
-    return res.status(400).json({ message: 'URL fehlt' });
+    return res.status(400).json({ message: 'URL ist erforderlich.' });
   }
 
+  // Generate a unique import ID
   const importId = Date.now().toString() + '-' + Math.round(Math.random() * 1e9);
-  downloadProgress[importId] = { progress: 0, status: 'pending', error: null };
+  downloadProgress[importId] = { progress: 0, status: 'pending' };
 
-  // Run the download in the background
-  downloadFromUrl(url, uploadDir, importId)
-    .then(async ({ tempFilePath, tempDir }) => { // downloadFromUrl now returns tempFilePath and tempDir
-      try {
-        // Generate a unique filename for the permanent location
-        const fileExtension = path.extname(tempFilePath);
-        const uniqueFilename = Date.now() + '-' + Math.round(Math.random() * 1e9) + fileExtension;
-        const permanentFilePath = path.join(uploadDir, uniqueFilename);
+  res.json({ importId }); // Respond immediately with the import ID
 
-        // Move the file from the temporary directory to the permanent upload directory
-        fs.renameSync(tempFilePath, permanentFilePath);
+  try {
+    const uploadDir = path.join(__dirname, 'uploads');
+    const thumbDir = path.join(__dirname, 'thumbnails');
+    fs.mkdirSync(uploadDir, { recursive: true });
+    fs.mkdirSync(thumbDir, { recursive: true });
 
-        const thumbPath = await generateThumbnail(permanentFilePath, thumbDir);
-        const duration = await getDuration(permanentFilePath);
+    // Download the video using yt-dlp
+    const { tempFilePath, tempDir } = await downloadFromUrl(url, uploadDir, importId);
 
-        const relativeThumbPath = path.relative(__dirname, thumbPath).replace(/\\/g, '/');
-        const relativeFilePath = path.relative(__dirname, permanentFilePath).replace(/\\/g, '/');
+    // Generate a unique filename for the permanent location
+    const fileExtension = path.extname(tempFilePath);
+    const uniqueFilename = Date.now() + '-' + Math.round(Math.random() * 1e9) + fileExtension;
+    const permanentFilePath = path.join(uploadDir, uniqueFilename);
 
-        const stmt = db.prepare('INSERT INTO videos(title, description, filepath, thumbnail, duration, category, tags, is_public) VALUES (?,?,?,?,?,?,?,?)');
-        const info = stmt.run(
-          title || '',
-          description || '',
-          relativeFilePath,
-          '/' + relativeThumbPath,
-          duration,
-          category || '',
-          JSON.stringify(tags || []),
-          isPublic === false ? 0 : 1
-        );
+    // Move the file from the temporary directory to the permanent upload directory
+    fs.renameSync(tempFilePath, permanentFilePath);
 
-        downloadProgress[importId].status = 'completed';
-        downloadProgress[importId].videoId = info.lastInsertRowid;
+    // Determine MIME type (yt-dlp usually downloads in common formats, can refine this)
+    const mimeType = 'video/' + fileExtension.substring(1); // Simple guess based on extension
 
-        // Clean up the temporary directory after successful import
-        fs.rmdir(tempDir, { recursive: true }, (err) => {
-          if (err) {
-            console.error('Fehler beim Löschen des temporären Verzeichnisses:', err);
-          }
-        });
+    const thumbPath = await generateThumbnail(permanentFilePath, thumbDir);
+    const duration = await getDuration(permanentFilePath);
 
-      } catch (err) {
-        console.error('Fehler nach Download-Abschluss:', err);
-        downloadProgress[importId].status = 'error';
-        downloadProgress[importId].error = err.message;
-      }
-    })
-    .catch((err) => {
-      console.error('Fehler beim Herunterladen der URL:', err);
-      downloadProgress[importId].status = 'error';
-      downloadProgress[importId].error = err.message;
+    // Speichere nur den relativen Pfad für das Thumbnail
+    const relativeThumbPath = path.relative(__dirname, thumbPath).replace(/\\/g, '/');
+    const relativeFilePath = path.relative(__dirname, permanentFilePath).replace(/\\/g, '/');
+
+    const stmt = db.prepare('INSERT INTO videos(title, description, filepath, thumbnail, duration, category, tags, is_public, mime_type) VALUES (?,?,?,?,?,?,?,?,?)');
+    const info = stmt.run(
+      title || '',
+      description || '',
+      relativeFilePath,
+      '/' + relativeThumbPath,
+      duration,
+      category || '',
+      JSON.stringify(tags || []),
+      isPublic === false ? 0 : 1,
+      mimeType
+    );
+
+    // Clean up the temporary directory after successful import
+    fs.rmdir(tempDir, { recursive: true }, (err) => {
+      if (err) console.error('Fehler beim Löschen des temporären Verzeichnisses nach Import:', err);
     });
 
-  res.json({ importId }); // Return the import ID immediately
+    // Update progress to completed
+    if (downloadProgress[importId]) {
+      downloadProgress[importId].progress = 100;
+      downloadProgress[importId].status = 'completed';
+      downloadProgress[importId].videoId = info.lastInsertRowid; // Optionally send video ID
+    }
+
+  } catch (err) {
+    console.error('Fehler beim URL-Import:', err);
+    // Update progress to error
+    if (downloadProgress[importId]) {
+      downloadProgress[importId].status = 'error';
+      downloadProgress[importId].error = err.message;
+    }
+    // Note: Temporary directory cleanup on error is handled within downloadFromUrl
+  }
 });
 
 app.get('/api/videos', (req, res) => {
-  const rows = db.prepare('SELECT id, title, description, thumbnail, duration, created_at FROM videos ORDER BY created_at DESC').all();
-  res.json(rows);
+  console.log('Fetching videos from database...'); // Log before fetching
+  try {
+    const rows = db.prepare('SELECT id, title, description, thumbnail, duration, created_at FROM videos ORDER BY created_at DESC').all();
+    console.log('Successfully fetched videos:', rows.length); // Log number of videos fetched
+    console.log('Fetched video data (first 5):', rows.slice(0, 5)); // Log first 5 videos
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching videos:', err); // Log any errors
+    res.status(500).json({ message: 'Fehler beim Abrufen der Videos', error: err.message });
+  }
 });
 
 app.get('/api/videos/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM videos WHERE id=?').get(req.params.id);
-  if (!row) return res.status(404).end();
+  if (!row) {
+    console.log(`Video with ID ${req.params.id} not found.`); // Log if video not found
+    return res.status(404).end();
+  }
 
-  console.log(`Abgerufener Dateipfad aus DB: ${row.filepath}`);
-  const filePath = path.resolve(row.filepath);
-  console.log(`Aufgelöster Dateipfad: ${filePath}`);
+  console.log(`Abgerufener Dateipfad aus DB für Video ID ${req.params.id}: ${row.filepath}`); // Log retrieved filepath
+  const filePath = path.resolve(__dirname, row.filepath); // Resolve path relative to server directory
+  console.log(`Aufgelöster Dateipfad: ${filePath}`); // Log resolved filepath
+  console.log(`Abgerufener MIME-Typ aus DB: ${row.mime_type}`); // Log retrieved mime type
+
 
   fs.stat(filePath, (err, stat) => {
     if (err) {
@@ -386,7 +399,7 @@ app.get('/api/videos/:id', (req, res) => {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': chunksize,
-        'Content-Type': 'video/mp4', // Annahme: MP4, muss ggf. dynamisch ermittelt werden
+        'Content-Type': row.mime_type || 'video/mp4', // Use stored mime_type or default to video/mp4
       };
   
       res.writeHead(206, head);
@@ -394,7 +407,7 @@ app.get('/api/videos/:id', (req, res) => {
     } else {
       const head = {
         'Content-Length': fileSize,
-        'Content-Type': 'video/mp4', // Annahme: MP4, muss ggf. dynamisch ermittelt werden
+        'Content-Type': row.mime_type || 'video/mp4', // Use stored mime_type or default to video/mp4
       };
       res.writeHead(200, head);
       const file = fs.createReadStream(filePath);
@@ -405,59 +418,6 @@ app.get('/api/videos/:id', (req, res) => {
       file.pipe(res);
     }
   });
-});
-
-// PUT update video data
-app.put('/api/videos/:id', (req, res) => {
-  try {
-    const id = req.params.id;
-    const { title, description, category, tags, is_public } = req.body; // Erwarte aktualisierte Felder
-    
-    // Überprüfe, ob das Video existiert
-    const video = db.prepare('SELECT id FROM videos WHERE id = ?').get(id);
-    if (!video) {
-      return res.status(404).json({ message: 'Video nicht gefunden' });
-    }
-
-    // Aktualisiere die Datenbank
-    const stmt = db.prepare('UPDATE videos SET title = ?, description = ?, category = ?, tags = ?, is_public = ? WHERE id = ?');
-    stmt.run(
-      title || '',
-      description || '',
-      category || '',
-      JSON.stringify(tags || []),
-      is_public === false ? 0 : 1,
-      id
-    );
-
-    res.json({ message: 'Video erfolgreich aktualisiert' });
-
-  } catch (err) {
-    console.error('Fehler beim Aktualisieren des Videos:', err);
-    res.status(500).json({ message: 'Fehler beim Aktualisieren des Videos', error: err.message });
-  }
-});
-
-app.delete('/api/videos/:id', (req, res) => {
-  try {
-    const id = req.params.id;
-    const video = db.prepare('SELECT * FROM videos WHERE id = ?').get(id);
-    if (!video) {
-      return res.status(404).json({ message: 'Video nicht gefunden' });
-    }
-    // Videodatei und Thumbnail löschen
-    if (fs.existsSync(video.filepath)) {
-      fs.unlinkSync(video.filepath);
-    }
-    if (fs.existsSync(path.join(__dirname, video.thumbnail))) {
-      fs.unlinkSync(path.join(__dirname, video.thumbnail));
-    }
-    // Datenbankeintrag löschen
-    db.prepare('DELETE FROM videos WHERE id = ?').run(id);
-    res.json({ message: 'Video gelöscht' });
-  } catch (err) {
-    res.status(500).json({ message: 'Fehler beim Löschen des Videos', error: err.message });
-  }
 });
 
 const downloadFromUrl = (url, baseDir, importId) => {
