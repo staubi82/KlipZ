@@ -437,7 +437,7 @@ export function Upload() {
               <>
                 <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
-                  Import erfolgreich!
+                  Import erfolgreich abgeschlossen!
                 </h3>
                 <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
                   Ihr Video wurde erfolgreich importiert und verarbeitet.
@@ -480,25 +480,26 @@ export function Upload() {
               <>
                 <Loader2 className="w-12 h-12 text-cyber-primary animate-spin mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
-                  Lade Video hoch...
+                  Video wird transkodiert...
                 </h3>
                 <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
-                  Bitte warten Sie, während Ihre Datei übertragen wird.
+                  Das Video wird gerade verarbeitet. Sie können warten oder das Fenster schließen -
+                  die Transkodierung läuft im Hintergrund weiter.
                 </p>
+                <button
+                  onClick={() => setFileUploadStatus('idle')} // Close overlay
+                  className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
+                >
+                  Schließen
+                </button>
               </>
             )}
             {fileUploadStatus === 'uploaded' && (
               <>
                 <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
-                  Datei erfolgreich hochgeladen
+                  Upload erfolgreich abgeschlossen!
                 </h3>
-                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
-                  Die Transkodierung startet jetzt im Hintergrund.
-                </p>
-                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
-                  Das Transkodieren kann einige Zeit dauern. Sie können dieses Fenster schließen und die Liste der Videos überprüfen, sobald es fertig ist.
-                </p>
                 <button
                   onClick={() => setFileUploadStatus('idle')} // Close overlay
                   className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
@@ -767,21 +768,24 @@ export function Upload() {
                     </select>
                   </div>
                   
-                  <div>
-                    <label className="flex items-center space-x-3">
+                  <div className="rounded-xl border-2 border-dashed border-cyber-primary/30 p-4 bg-cyber-primary/5">
+                    <label className="flex items-start space-x-3">
                       <input
                         type="checkbox"
                         checked={batchMetadata.transcode}
                         onChange={(e) => setBatchMetadata(prev => ({ ...prev, transcode: e.target.checked }))}
-                        className="w-5 h-5 text-cyber-primary bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded focus:ring-cyber-primary focus:ring-2"
+                        className="w-5 h-5 text-cyber-primary bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded focus:ring-cyber-primary focus:ring-2 mt-1"
                       />
-                      <span className="text-sm font-medium text-cyber-text-light dark:text-white">
-                        Videos transkodieren (nacheinander verarbeitet)
-                      </span>
+                      <div>
+                        <span className="text-sm font-medium text-cyber-text-light dark:text-white">
+                          Videos transkodieren (nacheinander verarbeitet)
+                        </span>
+                        <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-1">
+                          Konvertiert Videos für bessere Kompatibilität und kleinere Dateigröße.
+                          ⚠️ Bei großen Videos kann dies sehr lange dauern - bitte haben Sie Geduld!
+                        </p>
+                      </div>
                     </label>
-                    <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-1 ml-8">
-                      Konvertiert Videos für bessere Kompatibilität und kleinere Dateigröße
-                    </p>
                   </div>
                 </div>
                 
@@ -964,55 +968,27 @@ export function Upload() {
                     className="w-full bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded-xl py-3 px-4 text-cyber-text-light dark:text-white placeholder-cyber-text-light/50 dark:placeholder-white/50 focus:outline-none focus:border-cyber-primary transition-all"
                   />
                 </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
-                    Sichtbarkeit
-                  </label>
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setIsPublic(true)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 transition-all ${
-                        isPublic
-                          ? 'border-cyber-primary bg-cyber-primary/10 text-cyber-primary'
-                          : 'border-cyber-primary/30 text-cyber-text-light/60 dark:text-white/60'
-                      }`}
-                    >
-                      <Globe className="w-5 h-5" />
-                      <span>Öffentlich</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsPublic(false)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 transition-all ${
-                        !isPublic
-                          ? 'border-cyber-primary bg-cyber-primary/10 text-cyber-primary'
-                          : 'border-cyber-primary/30 text-cyber-text-light/60 dark:text-white/60'
-                      }`}
-                    >
-                      <LockIcon className="w-5 h-5" />
-                      <span>Privat</span>
-                    </button>
+                                
+                {/* Transcode Option - Improved Design */}
+                <div className="rounded-xl border-2 border-dashed border-cyber-primary/30 p-6 bg-cyber-primary/5">
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      id="transcode-checkbox"
+                      checked={transcode}
+                      onChange={(e) => setTranscode(e.target.checked)}
+                      className="form-checkbox h-5 w-5 text-cyber-primary rounded border-cyber-primary/30 focus:ring-cyber-primary dark:bg-gray-700 dark:border-gray-600 dark:checked:bg-cyber-primary dark:checked:border-transparent mt-1"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="transcode-checkbox" className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80 cursor-pointer">
+                        Video transkodieren (empfohlen für bessere Kompatibilität)
+                      </label>
+                      <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-2">
+                        ⚠️ Bei großen oder langen Videos kann die Transkodierung mehrere Minuten bis Stunden dauern.
+                        Bitte haben Sie Geduld.
+                      </p>
+                    </div>
                   </div>
-                </div>
-                
-                {/* Transcode Option */}
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="transcode-checkbox"
-                    checked={transcode}
-                    onChange={(e) => setTranscode(e.target.checked)}
-                    className="form-checkbox h-5 w-5 text-cyber-primary rounded border-cyber-primary/30 focus:ring-cyber-primary dark:bg-gray-700 dark:border-gray-600 dark:checked:bg-cyber-primary dark:checked:border-transparent"
-                  />
-                  <label htmlFor="transcode-checkbox" className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
-                    Video transkodieren (empfohlen für bessere Kompatibilität)
-                  </label>
-                </div>
-
-                <div className="flex items-center gap-2 text-cyber-text-light/60 dark:text-white/60 text-sm mt-8">
-                  <AlertCircle className="w-4 h-4" />
                 </div>
               </div>
               
