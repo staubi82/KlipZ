@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Video, User, Sun, Moon, Search, Upload, Menu, X, Home, Star, Clock, History, LogOut } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { ENABLE_REGISTRATION } from '../config';
 
 export function Navigation() {
   const { isDarkMode, toggleDarkMode } = useTheme();
@@ -123,12 +124,14 @@ export function Navigation() {
                 >
                   Anmelden
                 </Link>
-                <Link
-                  to="/register"
-                  className="px-4 py-2 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary transition-all"
-                >
-                  Registrieren
-                </Link>
+                {ENABLE_REGISTRATION && (
+                  <Link
+                    to="/register"
+                    className="px-4 py-2 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary transition-all"
+                  >
+                    Registrieren
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -213,14 +216,16 @@ export function Navigation() {
                     <span className="font-medium">Anmelden</span>
                   </Link>
                   
-                  <Link
-                    to="/register"
-                    className="flex items-center space-x-3 w-full p-3 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <User className="w-5 h-5" />
-                    <span className="font-medium">Registrieren</span>
-                  </Link>
+                  {ENABLE_REGISTRATION && (
+                    <Link
+                      to="/register"
+                      className="flex items-center space-x-3 w-full p-3 rounded-xl bg-cyber-primary/20 hover:bg-cyber-primary/30 text-cyber-primary"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <User className="w-5 h-5" />
+                      <span className="font-medium">Registrieren</span>
+                    </Link>
+                  )}
                 </>
               )}
             </div>

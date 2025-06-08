@@ -122,6 +122,12 @@ const authenticateToken = (req, res, next) => {
 
 // Auth routes
 app.post('/api/auth/register', async (req, res) => {
+  // Prüfen ob Registrierung aktiviert ist
+  const registrationEnabled = process.env.ENABLE_REGISTRATION !== 'false';
+  if (!registrationEnabled) {
+    return res.status(403).json({ message: 'Registrierung ist derzeit deaktiviert. Nur Login ist möglich.' });
+  }
+
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {

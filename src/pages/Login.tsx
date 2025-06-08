@@ -2,6 +2,7 @@ import React, { useState, FormEvent } from 'react';
 import { Video } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
+import { ENABLE_REGISTRATION } from '../config';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -135,17 +136,19 @@ export function Login() {
               </span>
             </button>
             
-            <div className="text-center">
-              <p className="text-cyber-primary/60 dark:text-blue-300/60">
-                Noch kein Account?{' '}
-                <Link
-                  to="/register"
-                  className="text-cyber-primary dark:text-blue-400 hover:text-cyber-primary/80 dark:hover:text-blue-300/80 transition-colors duration-300 font-semibold"
-                >
-                  Hier registrieren
-                </Link>
-              </p>
-            </div>
+            {ENABLE_REGISTRATION && (
+              <div className="text-center">
+                <p className="text-cyber-primary/60 dark:text-blue-300/60">
+                  Noch kein Account?{' '}
+                  <Link
+                    to="/register"
+                    className="text-cyber-primary dark:text-blue-400 hover:text-cyber-primary/80 dark:hover:text-blue-300/80 transition-colors duration-300 font-semibold"
+                  >
+                    Hier registrieren
+                  </Link>
+                </p>
+              </div>
+            )}
           </div>
         </form>
       </div>

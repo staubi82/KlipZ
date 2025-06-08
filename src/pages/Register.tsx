@@ -2,7 +2,7 @@ import React, { useState, FormEvent } from 'react';
 import { Video, User, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
-import { API_BASE } from '../config';
+import { API_BASE, ENABLE_REGISTRATION } from '../config';
 
 export function Register() {
   const [username, setUsername] = useState('');
@@ -17,6 +17,11 @@ export function Register() {
   // Wenn der Benutzer bereits angemeldet ist, zur Startseite umleiten
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
+  }
+  
+  // Wenn Registrierung deaktiviert ist, zur Login-Seite umleiten
+  if (!ENABLE_REGISTRATION) {
+    return <Navigate to="/login" replace />;
   }
   
   const handleSubmit = async (e: FormEvent) => {
