@@ -27,13 +27,15 @@ export function Upload() {
   const [category, setCategory] = useState('');
   const [isFormatSupportedForPreview, setIsFormatSupportedForPreview] = useState(true);
   const [transcode, setTranscode] = useState(false);
+  const [slowTranscode, setSlowTranscode] = useState(false);
   
   // Batch-specific metadata
   const [batchMetadata, setBatchMetadata] = useState({
     category: '',
     tags: '',
     description: '',
-    transcode: false
+    transcode: false,
+    slowTranscode: false
   });
 
   // State for URL import
@@ -173,6 +175,7 @@ export function Upload() {
       formData.append('title', title);
       formData.append('description', description);
       formData.append('transcode', transcode.toString()); // Send transcode option
+      formData.append('slowTranscode', slowTranscode.toString()); // Send slow transcode option
       // Add category, tags, and visibility
       formData.append('category', category || 'alle'); // Default to 'alle' if no category selected
       formData.append('tags', JSON.stringify(tags)); // Send tags as JSON string
@@ -221,7 +224,8 @@ export function Upload() {
       category: '',
       tags: '',
       description: '',
-      transcode: false
+      transcode: false,
+      slowTranscode: false
     });
   };
 
@@ -247,6 +251,7 @@ export function Upload() {
         formData.append('title', fileTitle);
         formData.append('description', batchMetadata.description);
         formData.append('transcode', batchMetadata.transcode.toString());
+        formData.append('slowTranscode', batchMetadata.slowTranscode.toString());
         formData.append('category', batchMetadata.category || 'alle');
         
         // Parse tags from comma-separated string
@@ -1003,26 +1008,51 @@ export function Upload() {
                   />
                 </div>
                                 
-                {/* Transcode Option - Improved Design */}
-                <div className="rounded-xl border-2 border-dashed border-cyber-primary/30 p-6 bg-cyber-primary/5">
-                  <div className="flex items-start space-x-3">
-                    <input
-                      type="checkbox"
-                      id="transcode-checkbox"
-                      checked={transcode}
-                      onChange={(e) => setTranscode(e.target.checked)}
-                      className="form-checkbox h-5 w-5 text-cyber-primary rounded border-cyber-primary/30 focus:ring-cyber-primary dark:bg-gray-700 dark:border-gray-600 dark:checked:bg-cyber-primary dark:checked:border-transparent mt-1"
-                    />
-                    <div className="flex-1">
-                      <label htmlFor="transcode-checkbox" className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80 cursor-pointer">
-                        Video transkodieren (empfohlen für bessere Kompatibilität)
-                      </label>
-                      <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-2">
-                        ⚠️ Bei großen oder langen Videos kann die Transkodierung mehrere Minuten bis Stunden dauern.
-                        Bitte haben Sie Geduld.
-                      </p>
+                {/* Transcode Options - Improved Design */}
+                <div className="space-y-4">
+                  <div className="rounded-xl border-2 border-dashed border-cyber-primary/30 p-6 bg-cyber-primary/5">
+                    <div className="flex items-start space-x-3">
+                      <input
+                        type="checkbox"
+                        id="transcode-checkbox"
+                        checked={transcode}
+                        onChange={(e) => setTranscode(e.target.checked)}
+                        className="form-checkbox h-5 w-5 text-cyber-primary rounded border-cyber-primary/30 focus:ring-cyber-primary dark:bg-gray-700 dark:border-gray-600 dark:checked:bg-cyber-primary dark:checked:border-transparent mt-1"
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="transcode-checkbox" className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80 cursor-pointer">
+                          Video transkodieren (empfohlen für bessere Kompatibilität)
+                        </label>
+                        <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-2">
+                          ⚠️ Bei großen oder langen Videos kann die Transkodierung mehrere Minuten bis Stunden dauern.
+                          Bitte haben Sie Geduld.
+                        </p>
+                      </div>
                     </div>
                   </div>
+                  
+                  {transcode && (
+                    <div className="rounded-xl border-2 border-dashed border-orange-400/30 p-6 bg-orange-400/5">
+                      <div className="flex items-start space-x-3">
+                        <input
+                          type="checkbox"
+                          id="slow-transcode-checkbox"
+                          checked={slowTranscode}
+                          onChange={(e) => setSlowTranscode(e.target.checked)}
+                          className="form-checkbox h-5 w-5 text-orange-500 rounded border-orange-400/30 focus:ring-orange-500 dark:bg-gray-700 dark:border-gray-600 dark:checked:bg-orange-500 dark:checked:border-transparent mt-1"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor="slow-transcode-checkbox" className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80 cursor-pointer">
+                            🐌 Langsame Transkodierung (CPU-schonend)
+                          </label>
+                          <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-2">
+                            Reduziert die CPU-Auslastung auf geteilten Servern. Die Transkodierung dauert länger,
+                            aber andere Prozesse werden weniger beeinträchtigt. Empfohlen für VServer mit geteilter CPU.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               

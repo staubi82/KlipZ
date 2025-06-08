@@ -360,8 +360,9 @@ const upload = multer({
 app.post('/api/upload', upload.single('video'), async (req, res) => {
   const tempFilePath = req.file ? req.file.path : null;
   const tempDir = req.file ? path.dirname(req.file.path) : null;
-  // Get the transcode option from the request body, default to true
+  // Get the transcode options from the request body
   const transcode = req.body.transcode === 'true'; // FormData sends values as strings
+  const slowTranscode = req.body.slowTranscode === 'true'; // FormData sends values as strings
 
   if (!tempFilePath || !tempDir) {
     return res.status(400).json({ message: 'Keine Datei angegeben.' });
@@ -397,8 +398,8 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
 
     if (transcode) {
       // Transkodieren Sie das Video
-      console.log(`Starte Transkodierung für: ${finalFilePath}`);
-      const transcodedFilePath = await transcodeVideo(finalFilePath, uploadDir);
+      console.log(`Starte Transkodierung für: ${finalFilePath} (Langsam: ${slowTranscode})`);
+      const transcodedFilePath = await transcodeVideo(finalFilePath, uploadDir, slowTranscode);
       console.log(`Transkodierung abgeschlossen. Transkodierte Datei: ${transcodedFilePath}`);
 
       // Überprüfen Sie die transkodierte Datei
@@ -892,30 +893,97 @@ const getDuration = (file) => {
   });
 };
 
-const transcodeVideo = (inputFile, outputDir) => {
+const transcodeVideo = (inputFile, outputDir, slowTranscode = false) => {
   const outputFileName = path.basename(inputFile, path.extname(inputFile)) + '_transcoded.mp4';
   const outputFilePath = path.join(outputDir, outputFileName);
 
   return new Promise((resolve, reject) => {
-    ffmpeg(inputFile)
-      .outputOptions([
-        '-c:v libx264', // Video-Codec: H.264
-        '-preset fast', // Schnellere Transkodierung
-        '-crf 23', // Qualitätsfaktor (niedriger = besser Qualität, größer = kleinere Datei)
-        '-c:a aac', // Audio-Codec: AAC
-        '-b:a 128k', // Audio-Bitrate
-        '-movflags +faststart' // Für schnelleres Web-Streaming
-      ])
-      .output(outputFilePath)
-      .on('end', () => {
-        console.log(`Video erfolgreich transkodiert: ${inputFile} -> ${outputFilePath}`);
-        resolve(outputFilePath);
-      })
-      .on('error', (err) => {
-        console.error(`Fehler beim Transkodieren des Videos ${inputFile}:`, err);
+    // Ermittle die Anzahl der verfügbaren CPU-Kerne
+    const os = require('os');
+    const totalCores = os.cpus().length;
+    
+    // Wähle Preset basierend auf slowTranscode Option
+    const preset = slowTranscode ? 'slow' : 'fast';
+    
+    // Basis-Optionen für die Transkodierung
+    const baseOptions = [
+      '-c:v libx264', // Video-Codec: H.264
+      `-preset ${preset}`, // Preset basierend auf Modus
+      '-crf 23', // Qualitätsfaktor (niedriger = besser Qualität, größer = kleinere Datei)
+      '-c:a aac', // Audio-Codec: AAC
+      '-b:a 128k', // Audio-Bitrate
+      '-movflags +faststart', // Für schnelleres Web-Streaming
+      `-threads ${totalCores}` // Nutze alle verfügbaren Threads
+    ];
+
+    if (slowTranscode) {
+      // Berechne 60% der verfügbaren Threads (bei 4 Kernen = 2-3 Threads)
+      const slowThreads = Math.max(1, Math.ceil(totalCores * 0.6));
+      console.log(`Verwende CPU-schonende Transkodierung: ${slowThreads}/${totalCores} Threads (60%), niedrige Priorität, Preset '${preset}'`);
+      
+      // Angepasste Optionen für CPU-schonende Transkodierung
+      const slowOptions = [
+        '-c:v', 'libx264',
+        '-preset', preset,
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        '-threads', slowThreads.toString() // Verwende nur 60% der Threads
+      ];
+      
+      const args = [
+        '-i', inputFile,
+        ...slowOptions,
+        outputFilePath
+      ];
+      
+      // Einfache nice-Lösung ohne cpulimit
+      const ffmpegProcess = spawn('nice', ['-n', '15', 'ffmpeg', ...args]);
+      
+      let stderr = '';
+      
+      ffmpegProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+        // Parse FFmpeg progress from stderr
+        const progressMatch = data.toString().match(/time=(\d+):(\d+):(\d+\.\d+)/);
+        if (progressMatch) {
+          console.log(`CPU-schonende Transkodierung läuft... (niedrige Priorität)`);
+        }
+      });
+      
+      ffmpegProcess.on('close', (code) => {
+        if (code === 0) {
+          console.log(`Video erfolgreich transkodiert (CPU-schonend): ${inputFile} -> ${outputFilePath}`);
+          resolve(outputFilePath);
+        } else {
+          console.error(`FFmpeg Fehler (Code ${code}): ${stderr}`);
+          reject(new Error(`FFmpeg Fehler: ${stderr}`));
+        }
+      });
+      
+      ffmpegProcess.on('error', (err) => {
+        console.error(`Fehler beim Starten von FFmpeg:`, err);
         reject(err);
-      })
-      .run();
+      });
+      
+    } else {
+      console.log(`Verwende normale Transkodierung: ${totalCores} Threads (normale Priorität), Preset '${preset}'`);
+      
+      // Normale Transkodierung mit fluent-ffmpeg
+      ffmpeg(inputFile)
+        .outputOptions(baseOptions)
+        .output(outputFilePath)
+        .on('end', () => {
+          console.log(`Video erfolgreich transkodiert: ${inputFile} -> ${outputFilePath}`);
+          resolve(outputFilePath);
+        })
+        .on('error', (err) => {
+          console.error(`Fehler beim Transkodieren des Videos ${inputFile}:`, err);
+          reject(err);
+        })
+        .run();
+    }
   });
 };
 
