@@ -29,6 +29,11 @@ export function Upload() {
   const [transcode, setTranscode] = useState(false);
   const [slowTranscode, setSlowTranscode] = useState(false);
   
+  // New upload progress states
+  const [uploadProgress, setUploadProgress] = useState(0);
+  type UploadPhase = 'idle' | 'uploading' | 'transcoding' | 'completed' | 'error';
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
+  
   // Batch-specific metadata
   const [batchMetadata, setBatchMetadata] = useState({
     category: '',
@@ -160,25 +165,23 @@ export function Upload() {
     }
   };
 
-  const [fileUploadStatus, setFileUploadStatus] = useState<'idle' | 'uploading' | 'uploaded' | 'error'>('idle');
-
   const handleUpload = async () => {
     if (!selectedFile) return;
 
-    // Show uploading status immediately
-    setFileUploadStatus('uploading');
-    setIsLoading(true); // Keep isLoading for general loading indication if needed elsewhere
+    // Reset states and start upload
+    setUploadProgress(0);
+    setUploadPhase('uploading');
+    setIsLoading(true);
 
     try {
       const formData = new FormData();
       formData.append('video', selectedFile);
       formData.append('title', title);
       formData.append('description', description);
-      formData.append('transcode', transcode.toString()); // Send transcode option
-      formData.append('slowTranscode', slowTranscode.toString()); // Send slow transcode option
-      // Add category, tags, and visibility
-      formData.append('category', category || 'alle'); // Default to 'alle' if no category selected
-      formData.append('tags', JSON.stringify(tags)); // Send tags as JSON string
+      formData.append('transcode', transcode.toString());
+      formData.append('slowTranscode', slowTranscode.toString());
+      formData.append('category', category || 'alle');
+      formData.append('tags', JSON.stringify(tags));
       formData.append('isPublic', isPublic.toString());
 
       // Wähle die richtige Upload-URL basierend auf Dateigröße
@@ -188,24 +191,57 @@ export function Upload() {
       
       console.log(`Datei: ${selectedFile.name}, Größe: ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB, Upload-URL: ${uploadUrl}`);
 
-      const res = await fetch(uploadUrl, { method: 'POST', body: formData });
-      if (!res.ok) throw new Error('Upload fehlgeschlagen');
+      // Use XMLHttpRequest for progress tracking
+      const xhr = new XMLHttpRequest();
       
-      // Set status to uploaded after successful fetch response
-      setFileUploadStatus('uploaded');
-      // Reset form after successful upload
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setTitle('');
-      setDescription('');
-      setTags([]);
-      setCategory('');
-      setIsPublic(true);
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const progress = (e.loaded / e.total) * 100;
+          setUploadProgress(progress);
+        }
+      });
+
+      // Handle response
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          setUploadProgress(100);
+          
+          if (transcode) {
+            // If transcoding is enabled, keep upload phase active (will show close button at 100%)
+            // The overlay will stay open with the hint and close button
+          } else {
+            // If no transcoding, upload is complete
+            setUploadPhase('completed');
+            // Reset form after successful upload
+            setTimeout(() => {
+              setSelectedFile(null);
+              setPreviewUrl(null);
+              setTitle('');
+              setDescription('');
+              setTags([]);
+              setCategory('');
+              setIsPublic(true);
+              setUploadPhase('idle');
+              setUploadProgress(0);
+            }, 2000);
+          }
+        } else {
+          throw new Error('Upload fehlgeschlagen');
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        throw new Error('Netzwerkfehler beim Upload');
+      });
+
+      // Send the request
+      xhr.open('POST', uploadUrl);
+      xhr.send(formData);
 
     } catch (err) {
       console.error('Fehler beim Upload:', err);
-      setFileUploadStatus('error');
-      // Optionally show an error message to the user
+      setUploadPhase('error');
     } finally {
       setIsLoading(false);
     }
@@ -495,43 +531,85 @@ export function Upload() {
         </div>
       )}
 
-      {/* File Upload Status Overlay */}
-      {fileUploadStatus !== 'idle' && (
+      {/* Upload Progress Overlay */}
+      {uploadPhase !== 'idle' && (
         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 rounded-2xl">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg text-center max-w-md mx-4">
-            {fileUploadStatus === 'uploading' && (
+            {uploadPhase === 'uploading' && (
               <>
                 <Loader2 className="w-12 h-12 text-cyber-primary animate-spin mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
-                  Video wird transkodiert...
+                  Datei wird hochgeladen...
                 </h3>
                 <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
-                  Das Video wird gerade verarbeitet. Sie können warten oder das Fenster schließen -
-                  die Transkodierung läuft im Hintergrund weiter.
+                  Ihr Video wird gerade auf den Server übertragen.
                 </p>
-                <button
-                  onClick={() => setFileUploadStatus('idle')} // Close overlay
-                  className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
-                >
-                  Schließen
-                </button>
+                {/* Upload Progress Bar */}
+                <div className="relative pt-1 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-cyber-text-light/80 dark:text-white/80">
+                      Upload-Fortschritt
+                    </span>
+                    <span className="text-sm font-medium text-cyber-primary">
+                      {uploadProgress.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="overflow-hidden h-3 rounded-full bg-cyber-primary/20">
+                    <div
+                      style={{ width: `${uploadProgress}%` }}
+                      className="h-full bg-cyber-primary transition-all duration-300 rounded-full"
+                    />
+                  </div>
+                </div>
+                {/* Show close button when upload is complete (100%) and transcoding is enabled */}
+                {uploadProgress >= 100 && transcode && (
+                  <div className="mt-4">
+                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                        <strong>Hinweis:</strong> Sie können dieses Fenster jetzt schließen. Die Transkodierung läuft im Hintergrund weiter und Ihr Video erscheint automatisch in der Videoliste, sobald es fertig gerendert wurde. Bitte haben Sie etwas Geduld - je nach Videolänge kann dies einige Minuten dauern.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setUploadPhase('idle');
+                        setSelectedFile(null);
+                        setPreviewUrl(null);
+                        setTitle('');
+                        setDescription('');
+                        setTags([]);
+                        setCategory('');
+                        setIsPublic(true);
+                        setUploadProgress(0);
+                      }}
+                      className="w-full py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
+                    >
+                      Fenster schließen
+                    </button>
+                  </div>
+                )}
               </>
             )}
-            {fileUploadStatus === 'uploaded' && (
+            {uploadPhase === 'completed' && (
               <>
                 <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
                   Upload erfolgreich abgeschlossen!
                 </h3>
+                <p className="text-cyber-text-light/60 dark:text-white/60 mb-4">
+                  Ihr Video wurde erfolgreich hochgeladen und ist bereit zur Wiedergabe.
+                </p>
                 <button
-                  onClick={() => setFileUploadStatus('idle')} // Close overlay
+                  onClick={() => {
+                    setUploadPhase('idle');
+                    setUploadProgress(0);
+                  }}
                   className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
                 >
                   Schließen
                 </button>
               </>
             )}
-            {fileUploadStatus === 'error' && (
+            {uploadPhase === 'error' && (
               <>
                 <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-cyber-text-light dark:text-white mb-2">
@@ -541,7 +619,10 @@ export function Upload() {
                   Es gab einen Fehler beim Hochladen Ihrer Datei. Bitte versuchen Sie es erneut.
                 </p>
                 <button
-                  onClick={() => setFileUploadStatus('idle')} // Close overlay
+                  onClick={() => {
+                    setUploadPhase('idle');
+                    setUploadProgress(0);
+                  }}
                   className="mt-4 py-2 px-4 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300"
                 >
                   Schließen
@@ -1088,25 +1169,27 @@ export function Upload() {
                   </button>
                 ) : (
                   <>
-                    {fileUploadStatus === 'uploaded' ? (
+                    {uploadPhase === 'completed' && (
                        <div className="mb-4 flex flex-col gap-1 text-sm text-cyber-text-light/80 dark:text-white/80">
-                        <p>Datei erfolgreich übertragen.</p>
-                        <p>Starte Transkodierung.</p>
-                        <p>Das Transkodieren kann einige Zeit dauern. Sie können dieses Fenster schließen und die Liste der Videos überprüfen, sobald es fertig ist.</p>
+                        <p>Upload erfolgreich abgeschlossen!</p>
+                        <p>Ihr Video ist bereit zur Wiedergabe.</p>
                       </div>
-                    ) : (
+                    )}
+                    {(uploadPhase === 'idle' || uploadPhase === 'uploading' || uploadPhase === 'error') && (
                       <button
                         type="button"
                         className="flex-1 py-4 px-6 bg-cyber-primary text-white rounded-xl hover:bg-cyber-primary/90 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={handleUpload}
-                        disabled={fileUploadStatus === 'uploading' || !selectedFile}
+                        disabled={uploadPhase === 'uploading' || !selectedFile}
                       >
-                        {fileUploadStatus === 'uploading' ? (
+                        {uploadPhase === 'uploading' ? (
                           <Loader2 className="w-5 h-5 animate-spin" />
                         ) : (
                           <UploadIcon className="w-5 h-5" />
                         )}
-                        <span>{fileUploadStatus === 'uploading' ? 'Wird hochgeladen...' : 'Video hochladen'}</span>
+                        <span>
+                          {uploadPhase === 'uploading' ? 'Wird hochgeladen...' : 'Video hochladen'}
+                        </span>
                       </button>
                     )}
                   </>
