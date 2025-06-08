@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Upload as UploadIcon, Link as LinkIcon, Loader2, X, Film, AlertCircle, ArrowRight, CheckCircle2, Globe, Lock as LockIcon } from 'lucide-react';
 import { VideoJS } from '../components/VideoJS'; // Import VideoJS component
-import { API_BASE } from '../config';
+import { API_BASE, UPLOAD_BASE, CLOUDFLARE_UPLOAD_LIMIT } from '../config';
 
 export function Upload() {
   const [url, setUrl] = useState('');
@@ -83,6 +83,11 @@ export function Upload() {
         } else {
           console.log(`Browser kann Dateiformat abspielen: ${file.type} (${canPlay})`);
           setIsFormatSupportedForPreview(true);
+        }
+
+        // Warnung für große Dateien über Cloudflare-Limit
+        if (file.size > CLOUDFLARE_UPLOAD_LIMIT) {
+          console.log(`Große Datei erkannt (${(file.size / 1024 / 1024).toFixed(1)}MB) - wird direkte Upload-URL verwenden`);
         }
       }
     } else {
@@ -173,7 +178,14 @@ export function Upload() {
       formData.append('tags', JSON.stringify(tags)); // Send tags as JSON string
       formData.append('isPublic', isPublic.toString());
 
-      const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
+      // Wähle die richtige Upload-URL basierend auf Dateigröße
+      const uploadUrl = selectedFile.size > CLOUDFLARE_UPLOAD_LIMIT
+        ? `${UPLOAD_BASE}/api/upload`
+        : `${API_BASE}/api/upload`;
+      
+      console.log(`Datei: ${selectedFile.name}, Größe: ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB, Upload-URL: ${uploadUrl}`);
+
+      const res = await fetch(uploadUrl, { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Upload fehlgeschlagen');
       
       // Set status to uploaded after successful fetch response
@@ -242,7 +254,14 @@ export function Upload() {
         formData.append('tags', JSON.stringify(tagsArray));
         formData.append('isPublic', 'true'); // Default to public for batch uploads
 
-        const res = await fetch(`${API_BASE}/api/upload`, {
+        // Wähle die richtige Upload-URL basierend auf Dateigröße
+        const uploadUrl = file.size > CLOUDFLARE_UPLOAD_LIMIT
+          ? `${UPLOAD_BASE}/api/upload`
+          : `${API_BASE}/api/upload`;
+        
+        console.log(`Batch-Upload - Datei: ${file.name}, Größe: ${(file.size / 1024 / 1024).toFixed(1)}MB, Upload-URL: ${uploadUrl}`);
+
+        const res = await fetch(uploadUrl, {
           method: 'POST',
           body: formData
         });
@@ -888,7 +907,23 @@ export function Upload() {
                   </div>
                 )}
                 
-                {/* Upload Progress for File Upload - Removed */}
+                {/* Warnung für große Dateien */}
+                {selectedFile && selectedFile.size > CLOUDFLARE_UPLOAD_LIMIT && (
+                  <div className="rounded-xl border-2 border-yellow-400/30 bg-yellow-400/10 p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                          Große Datei erkannt ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
+                        </h4>
+                        <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
+                          Diese Datei ist größer als 100MB und wird über eine direkte Verbindung hochgeladen,
+                          um Cloudflare's Upload-Limit zu umgehen. Der Upload kann länger dauern.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Metadata Fields (Title, Description, Category, Tags, Visibility) */}
                 <div className="space-y-2">

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { ENABLE_VIDEO_PREVIEWS } from '../config';
 
 interface VideoPreviewHoverProps {
   videoUrl: string;
@@ -26,18 +27,22 @@ export const VideoPreviewHover: React.FC<VideoPreviewHoverProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleMouseEnter = () => {
-    setIsHovered(true);
-    if (videoRef.current && !videoError) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play().catch(e => console.warn('Video play prevented:', e));
+    if (ENABLE_VIDEO_PREVIEWS) {
+      setIsHovered(true);
+      if (videoRef.current && !videoError) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play().catch(e => console.warn('Video play prevented:', e));
+      }
     }
   };
 
   const handleMouseLeave = () => {
-    setIsHovered(false);
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
+    if (ENABLE_VIDEO_PREVIEWS) {
+      setIsHovered(false);
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
     }
   };
 
@@ -52,7 +57,7 @@ export const VideoPreviewHover: React.FC<VideoPreviewHoverProps> = ({
         alt={title}
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isHovered ? 'opacity-0' : 'opacity-100'}`}
       />
-      {!videoError && (
+      {ENABLE_VIDEO_PREVIEWS && !videoError && (
         <video
           ref={videoRef}
           src={videoUrl}

@@ -14,7 +14,8 @@ const downloadProgress = {};
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // Statische Verzeichnisse für Uploads und Thumbnails bereitstellen
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -340,7 +341,15 @@ const storage = multer.diskStorage({
     cb(null, file.originalname); // Use original filename in temp dir
   }
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 * 1024, // 10GB für Video-Uploads
+    fieldSize: 50 * 1024 * 1024,       // 50MB für Metadaten-Felder
+    fields: 20,                        // Anzahl der erlaubten Felder
+    files: 1                           // Nur eine Datei pro Upload
+  }
+});
 
 app.post('/api/upload', upload.single('video'), async (req, res) => {
   const tempFilePath = req.file ? req.file.path : null;
@@ -712,9 +721,15 @@ app.put('/api/videos/:id', (req, res) => {
       changes: result.changes 
     });
     
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren des Videos:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Videos' });
+  }
+});
+
 // DELETE endpoint to delete a video
 app.delete('/api/videos/:id', (req, res) => {
-  const { id } = req.params;
+  const id = parseInt(req.params.id, 10);
   
   try {
     // First, get the video info to delete associated files
@@ -749,20 +764,15 @@ app.delete('/api/videos/:id', (req, res) => {
     */
     
     console.log(`Video ${id} erfolgreich gelöscht`);
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Video erfolgreich gelöscht',
-      deletedId: id 
+      deletedId: id
     });
     
   } catch (error) {
     console.error('Fehler beim Löschen des Videos:', error);
     res.status(500).json({ error: 'Fehler beim Löschen des Videos' });
-  }
-});
-  } catch (error) {
-    console.error('Fehler beim Aktualisieren des Videos:', error);
-    res.status(500).json({ error: 'Fehler beim Aktualisieren des Videos' });
   }
 });
 
