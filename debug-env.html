@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Environment Variables</title>
+</head>
+<body>
+    <h1>Environment Variables Debug</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        // Test all VITE_ environment variables
+        const envVars = {
+            'VITE_ENABLE_REGISTRATION': import.meta.env.VITE_ENABLE_REGISTRATION,
+            'VITE_BACKEND_PORT': import.meta.env.VITE_BACKEND_PORT,
+            'VITE_API_BASE': import.meta.env.VITE_API_BASE,
+            'MODE': import.meta.env.MODE,
+            'DEV': import.meta.env.DEV,
+            'PROD': import.meta.env.PROD
+        };
+        
+        let html = '<h2>Environment Variables:</h2><ul>';
+        for (const [key, value] of Object.entries(envVars)) {
+            html += `<li><strong>${key}:</strong> ${value} (type: ${typeof value})</li>`;
+        }
+        html += '</ul>';
+        
+        // Test the config import
+        import('./src/config.ts').then(config => {
+            html += '<h2>Config Values:</h2><ul>';
+            html += `<li><strong>ENABLE_REGISTRATION:</strong> ${config.ENABLE_REGISTRATION} (type: ${typeof config.ENABLE_REGISTRATION})</li>`;
+            html += `<li><strong>API_BASE:</strong> ${config.API_BASE}</li>`;
+            html += '</ul>';
+            output.innerHTML = html;
+        }).catch(err => {
+            html += `<p style="color: red;">Error loading config: ${err.message}</p>`;
+            output.innerHTML = html;
+        });
+    </script>
+</body>
+</html>

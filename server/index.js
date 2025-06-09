@@ -1,3 +1,6 @@
+// Load environment variables from .env file in parent directory
+require('dotenv').config({ path: '../.env' });
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
