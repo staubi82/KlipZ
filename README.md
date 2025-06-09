@@ -1,57 +1,59 @@
 # Klipzz
 
-Dieses Repository enthält das Frontend-Design im Ordner `src` und ein Node.js-Backend im Ordner `server`.
+**Klipzz** ist eine moderne Video-Plattform, die es Benutzern ermöglicht, Videos hochzuladen, zu verwalten und zu teilen. Die Anwendung bietet eine intuitive Benutzeroberfläche mit erweiterten Video-Player-Funktionen und sozialen Features.
 
-## Installation
+## Features
 
-1. Repository klonen und ins Projektverzeichnis wechseln:
-   ```bash
-   git clone <REPO-URL>
-   cd Klipzz
-   ```
-2. Umgebungsvariablen konfigurieren:
-   ```bash
-   cp .env.example .env
-   ```
-   Bearbeite die `.env`-Datei und passe die API-URL an deine Bedürfnisse an.
+- 🎥 **Video-Upload & Management** - Hochladen und Verwalten von Videos mit automatischer Thumbnail-Generierung
+- 📺 **Erweiterte Video-Wiedergabe** - Professioneller Video-Player mit Video.js
+- 🔗 **URL-Import** - Importieren von Videos über URLs (unterstützt durch yt-dlp)
+- ❤️ **Favoriten & Trending** - Markieren von Lieblingsvideos und Entdecken beliebter Inhalte
+- 🆕 **New Drops** - Übersicht über die neuesten hochgeladenen Videos
+- 👤 **Benutzerprofile** - Personalisierte Profile und Authentifizierung
+- 🌙 **Dark/Light Mode** - Umschaltbare Themes für optimale Benutzererfahrung
+- 📱 **Responsive Design** - Optimiert für Desktop und mobile Geräte
 
-3. Abhängigkeiten installieren. Node.js sowie `ffmpeg` und `yt-dlp` müssen auf dem System vorhanden sein.
-   ```bash
-   npm install
-   ```
+## Technologie-Stack
 
-## Umgebungsvariablen
+- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
+- **Backend**: Node.js + Express + SQLite
+- **Video-Processing**: FFmpeg + yt-dlp
+- **State Management**: Zustand
+- **Routing**: React Router
+- **UI Components**: Lucide React Icons
 
-Die Anwendung verwendet folgende Umgebungsvariablen:
+## Installation & Konfiguration
 
-- `VITE_API_BASE`: Die Basis-URL für das Backend-API (Standard: `http://localhost:3301`)
+Detaillierte Anleitungen zur Installation, Konfiguration und Bereitstellung findest du in unserem **[Wiki](../../wiki)**.
 
-## Frontend starten
+Das Wiki enthält:
+- Schritt-für-Schritt Installationsanleitung
+- Konfiguration der Umgebungsvariablen
+- Server-Setup und Deployment
+- Troubleshooting und FAQ
 
-Im Entwicklungsmodus startet ihr die Oberfläche mit Vite:
+## Schnellstart
+
 ```bash
+# Repository klonen
+git clone <REPO-URL>
+cd Klipzz
+
+# Umgebungsvariablen konfigurieren
+cp .env.example .env
+
+# Abhängigkeiten installieren
+npm install
+
+# Frontend starten
 npm run dev
+
+# Backend starten (in separatem Terminal)
+cd server
+npm install
+node index.js
 ```
-Nach dem Build kann das fertige Frontend aus dem Ordner `dist` statisch
-serviert werden, z.B. so:
-```bash
-npm run build
-npx serve -s dist -l 3300
-```
-Danach `http://localhost:3300` im Browser öffnen.
 
+## Lizenz
 
-## Backend starten
-
-1. Abhängigkeiten installieren:
-   ```bash
-   cd server
-   npm install
-   ```
-2. Server starten:
-   ```bash
-   node index.js
-   ```
-   Der Backend-Server läuft standardmäßig auf Port **3301**.
-
-Der Server speichert hochgeladene Videos sowie via URL importierte Inhalte in `server/uploads` und generiert Vorschaubilder in `server/thumbnails`. Die Metadaten werden in einer SQLite-Datenbank `videos.db` verwaltet.
+Dieses Projekt ist privat und nicht für die öffentliche Nutzung bestimmt.
