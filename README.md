@@ -1,14 +1,13 @@
-# Klipzz
+# KlipZ
 
-**Klipzz** ist eine moderne Video-Plattform, die es Benutzern ermöglicht, Videos hochzuladen, zu verwalten und zu teilen. Die Anwendung bietet eine intuitive Benutzeroberfläche mit erweiterten Video-Player-Funktionen und sozialen Features.
+**KlipZ** ist eine moderne Video-Plattform, die es Benutzern ermöglicht, Videos hochzuladen, zu verwalten und zu teilen. Die Anwendung bietet eine intuitive Benutzeroberfläche mit erweiterten Video-Player-Funktionen und sozialen Features.
 
 ## Features
 
 - 🎥 **Video-Upload & Management** - Hochladen und Verwalten von Videos mit automatischer Thumbnail-Generierung
 - 📺 **Erweiterte Video-Wiedergabe** - Professioneller Video-Player mit Video.js
 - 🔗 **URL-Import** - Importieren von Videos über URLs (unterstützt durch yt-dlp)
-- ❤️ **Favoriten & Trending** - Markieren von Lieblingsvideos und Entdecken beliebter Inhalte
-- 🆕 **New Drops** - Übersicht über die neuesten hochgeladenen Videos
+- ❤️ **Favoriten** - Markieren von Lieblingsvideos und Entdecken beliebter Inhalte
 - 👤 **Benutzerprofile** - Personalisierte Profile und Authentifizierung
 - 🌙 **Dark/Light Mode** - Umschaltbare Themes für optimale Benutzererfahrung
 - 📱 **Responsive Design** - Optimiert für Desktop und mobile Geräte
@@ -37,7 +36,7 @@ Das Wiki enthält:
 ```bash
 # Repository klonen
 git clone <REPO-URL>
-cd Klipzz
+cd KlipZ
 
 # Umgebungsvariablen konfigurieren
 cp .env.example .env
@@ -53,6 +52,41 @@ cd server
 npm install
 node index.js
 ```
+
+## Roadmap
+
+### ✅ Bereits implementiert
+- [x] **Video-Upload** - Hochladen lokaler Videodateien
+- [x] **Video-Wiedergabe** - Professioneller Player mit Video.js
+- [x] **URL-Import** - Importieren von Videos über URLs
+- [x] **Video-Transkoding** - Automatische Konvertierung und Optimierung
+- [x] **Hell/Dunkel Modus** - Umschaltbare Themes
+- [x] **Favoriten** - Markieren und Verwalten von Lieblingsvideos
+- [x] **Benutzerprofile** - Authentifizierung und Profilverwaltung
+- [x] **Responsive Design** - Mobile und Desktop Optimierung
+- [x] **Download Button** - Videos herunterladen
+
+### 🚧 In Entwicklung
+- [ ] **Trending Videos** - Beliebte und häufig angesehene Inhalte
+- [ ] **Neue Videos** - Chronologische Übersicht der neuesten Uploads
+- [ ] **Wiedergabeverlauf** - Persönlicher Verlauf angesehener Videos
+- [ ] **Empfehlungsalgorithmus** - KI-basierte Videovorschläge
+- [ ] **Bewertungssystem** - Like/Dislike und Kommentarfunktion
+- [ ] **Statistiken & Analytics** - Detaillierte Wiedergabe-Statistiken
+
+### 💡 Geplante Features
+- [ ] **Playlists** - Erstellen und Verwalten von Video-Sammlungen
+- [ ] **Live-Streaming** - Echtzeit-Übertragungen
+- [ ] **Video-Bearbeitung** - Grundlegende Schnitt- und Bearbeitungstools
+- [ ] **Untertitel & Captions** - Automatische und manuelle Untertitel
+- [ ] **Qualitätsauswahl** - Verschiedene Auflösungen (480p, 720p, 1080p, 4K)
+- [ ] **Kapitel & Zeitstempel** - Navigation innerhalb langer Videos
+- [ ] **Teilen & Einbetten** - Social Media Integration und Embed-Codes
+- [ ] **Benachrichtigungen** - Push-Notifications für neue Inhalte
+- [ ] **Suchfunktion** - Erweiterte Video- und Metadatensuche
+- [ ] **Kategorien & Tags** - Organisierung nach Themen und Schlagwörtern
+- [ ] **Mehrsprachigkeit** - Internationalisierung (i18n)
+- [ ] **API & Webhooks** - Entwickler-API für Drittanbieter-Integration
 
 ## Lizenz
 
