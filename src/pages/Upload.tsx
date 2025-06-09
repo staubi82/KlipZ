@@ -872,24 +872,48 @@ export function Upload() {
                     </select>
                   </div>
                   
-                  <div className="rounded-xl border-2 border-dashed border-cyber-primary/30 p-4 bg-cyber-primary/5">
-                    <label className="flex items-start space-x-3">
-                      <input
-                        type="checkbox"
-                        checked={batchMetadata.transcode}
-                        onChange={(e) => setBatchMetadata(prev => ({ ...prev, transcode: e.target.checked }))}
-                        className="w-5 h-5 text-cyber-primary bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded focus:ring-cyber-primary focus:ring-2 mt-1"
-                      />
-                      <div>
-                        <span className="text-sm font-medium text-cyber-text-light dark:text-white">
-                          Videos transkodieren (nacheinander verarbeitet)
-                        </span>
-                        <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-1">
-                          Konvertiert Videos für bessere Kompatibilität und kleinere Dateigröße.
-                          ⚠️ Bei großen Videos kann dies sehr lange dauern - bitte haben Sie Geduld!
-                        </p>
+                  <div className="space-y-4">
+                    <div className="rounded-xl border-2 border-dashed border-cyber-primary/30 p-4 bg-cyber-primary/5">
+                      <label className="flex items-start space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={batchMetadata.transcode}
+                          onChange={(e) => setBatchMetadata(prev => ({ ...prev, transcode: e.target.checked }))}
+                          className="w-5 h-5 text-cyber-primary bg-white dark:bg-gray-700 border-2 border-cyber-primary/30 rounded focus:ring-cyber-primary focus:ring-2 mt-1"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-cyber-text-light dark:text-white">
+                            Videos transkodieren (nacheinander verarbeitet)
+                          </span>
+                          <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-1">
+                            Konvertiert Videos für bessere Kompatibilität und kleinere Dateigröße.
+                            ⚠️ Bei großen Videos kann dies sehr lange dauern - bitte haben Sie Geduld!
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                    
+                    {batchMetadata.transcode && (
+                      <div className="rounded-xl border-2 border-dashed border-orange-400/30 p-4 bg-orange-400/5">
+                        <label className="flex items-start space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={batchMetadata.slowTranscode}
+                            onChange={(e) => setBatchMetadata(prev => ({ ...prev, slowTranscode: e.target.checked }))}
+                            className="w-5 h-5 text-orange-500 bg-white dark:bg-gray-700 border-2 border-orange-400/30 rounded focus:ring-orange-500 focus:ring-2 mt-1"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-cyber-text-light dark:text-white">
+                              🐌 Langsame Transkodierung (CPU-schonend)
+                            </span>
+                            <p className="text-xs text-cyber-text-light/60 dark:text-white/60 mt-1">
+                              Reduziert die CPU-Auslastung auf geteilten Servern. Die Transkodierung dauert länger,
+                              aber andere Prozesse werden weniger beeinträchtigt. Empfohlen für VServer mit geteilter CPU.
+                            </p>
+                          </div>
+                        </label>
                       </div>
-                    </label>
+                    )}
                   </div>
                 </div>
                 
