@@ -1,5 +1,5 @@
 // Zentrale Konfiguration für API-URLs
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3301';
+export const API_BASE = import.meta.env.VITE_API_BASE || `http://localhost:${import.meta.env.VITE_BACKEND_PORT || 3000}`;
 
 // Separate Upload-URL die Cloudflare umgeht (für große Dateien)
 export const UPLOAD_BASE = import.meta.env.VITE_UPLOAD_BASE || API_BASE;

@@ -1028,5 +1028,5 @@ app.get('/api/import-progress/:importId', (req, res) => {
 });
 
 
-const PORT = process.env.PORT || 3301;
+const PORT = process.env.VITE_BACKEND_PORT || process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server läuft auf Port ${PORT}`));
