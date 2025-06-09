@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
-import '@videojs/themes/dist/city/index.css';
+// Wechsel zu dunklem Theme "forest"
+import '@videojs/themes/dist/forest/index.css';
+import './VideoJSCustom.css';
 
 interface VideoPlayerProps {
   options: any;
@@ -13,14 +15,29 @@ export const VideoJS = ({ options, onReady }: VideoPlayerProps) => {
   const playerRef = useRef<any>(null);
 
   useEffect(() => {
+    // Initialisiere den Player nur einmal
     if (!playerRef.current) {
-      const videoElement = document.createElement("video-js");
-      videoElement.classList.add('vjs-theme-city', 'vjs-big-play-centered');
+      const videoElement = document.createElement("video");
+      videoElement.classList.add('video-js', 'vjs-theme-city');
       videoRef.current?.appendChild(videoElement);
 
-      playerRef.current = videojs(videoElement, options, () => {
-        onReady && onReady(playerRef.current);
+      const player = playerRef.current = videojs(videoElement, options, () => {
+        onReady && onReady(player);
       });
+    } else {
+      // Wenn der Player bereits existiert, aktualisiere die Quelle, wenn sich die Optionen ändern
+      const player = playerRef.current;
+      if (options.sources && options.sources.length > 0) {
+        // Überprüfe, ob die aktuelle Quelle des Players anders ist als die neue Quelle
+        // Dies verhindert unnötiges Neuladen, wenn sich nur andere Optionen ändern
+        const currentSource = player.currentSrc();
+        const newSource = options.sources[0].src; // Annahme: nur eine Quelle
+
+        if (currentSource !== newSource) {
+           player.src(options.sources);
+           // Optional: player.play(); // Automatische Wiedergabe nach dem Laden der neuen Quelle
+        }
+      }
     }
 
     return () => {
@@ -29,11 +46,11 @@ export const VideoJS = ({ options, onReady }: VideoPlayerProps) => {
         playerRef.current = null;
       }
     };
-  }, [options, videoRef]);
+  }, [options, videoRef, onReady]); // Füge onReady zu den Abhängigkeiten hinzu, falls es sich ändert (unwahrscheinlich, aber gute Praxis)
 
   return (
-    <div data-vjs-player>
-      <div ref={videoRef} />
+    <div data-vjs-player style={{ width: '100%', height: '100%' }}>
+      <div ref={videoRef} style={{ width: '100%', height: '100%' }} />
     </div>
   );
 };
