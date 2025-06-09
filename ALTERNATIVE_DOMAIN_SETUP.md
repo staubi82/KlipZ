@@ -1,4 +1,4 @@
-# Setup für alternative Domain (ohne Cloudflare)
+# ALTERNATIVE_DOMAIN_SETUP.md wurde ins GitHub Wiki verschoben und kann aus dem Repository entfernt werden.
 
 ## Übersicht
 

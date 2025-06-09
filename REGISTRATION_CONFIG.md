@@ -1,4 +1,4 @@
-# Registrierung deaktivieren - Konfigurationsanleitung
+# REGISTRATION_CONFIG.md wurde ins GitHub Wiki verschoben und kann aus dem Repository entfernt werden.
 
 Diese Anleitung erklärt, wie Sie Neuregistrierungen in Klipz deaktivieren können, sodass nur noch Login möglich ist.
 

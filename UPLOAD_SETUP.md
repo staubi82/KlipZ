@@ -1,4 +1,4 @@
-# Upload-Konfiguration für große Dateien
+# UPLOAD_SETUP.md wurde ins GitHub Wiki verschoben und kann aus dem Repository entfernt werden.
 
 ## Problem
 Cloudflare hat ein Upload-Limit von 100MB für kostenlose Accounts. Dies verhindert das Hochladen großer Videodateien.
