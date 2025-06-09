@@ -56,15 +56,15 @@ node index.js
 ## Roadmap
 
 ### ✅ Bereits implementiert
-- [x] **Video-Upload** - Hochladen lokaler Videodateien
-- [x] **Video-Wiedergabe** - Professioneller Player mit Video.js
-- [x] **URL-Import** - Importieren von Videos über URLs
-- [x] **Video-Transkoding** - Automatische Konvertierung und Optimierung
-- [x] **Hell/Dunkel Modus** - Umschaltbare Themes
-- [x] **Favoriten** - Markieren und Verwalten von Lieblingsvideos
-- [x] **Benutzerprofile** - Authentifizierung und Profilverwaltung
-- [x] **Responsive Design** - Mobile und Desktop Optimierung
-- [x] **Download Button** - Videos herunterladen
+- ✅ **Video-Upload** - Hochladen lokaler Videodateien
+- ✅ **Video-Wiedergabe** - Professioneller Player mit Video.js
+- ✅ **URL-Import** - Importieren von Videos über URLs
+- ✅ **Video-Transkoding** - Automatische Konvertierung und Optimierung
+- ✅ **Hell/Dunkel Modus** - Umschaltbare Themes
+- ✅ **Favoriten** - Markieren und Verwalten von Lieblingsvideos
+- ✅ **Benutzerprofile** - Authentifizierung und Profilverwaltung
+- ✅ **Responsive Design** - Mobile und Desktop Optimierung
+- ✅ **Download Button** - Videos herunterladen
 
 ### 🚧 In Entwicklung
 - [ ] **Trending Videos** - Beliebte und häufig angesehene Inhalte
