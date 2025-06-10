@@ -16,7 +16,20 @@ const jwt = require('jsonwebtoken');
 const downloadProgress = {};
 
 const app = express();
-app.use(cors());
+
+// CORS-Konfiguration basierend auf .env
+const allowedOrigins = [];
+if (process.env.VITE_API_BASE) {
+  allowedOrigins.push(process.env.VITE_API_BASE);
+}
+
+const corsOptions = {
+  origin: allowedOrigins.length > 0 ? allowedOrigins : true, // Wenn keine Origins definiert, erlaube alle
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
@@ -488,8 +501,18 @@ app.post('/api/fetch-metadata', async (req, res) => {
   }
 
   try {
-    // Use yt-dlp to get video metadata in JSON format
-    const ytdlp = spawn('yt-dlp', ['--dump-json', url]);
+    // Use yt-dlp to get video metadata in JSON format with anti-bot measures
+    const ytdlp = spawn('/root/.local/bin/yt-dlp', [
+      '--dump-json',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '--extractor-retries', '5',
+      '--fragment-retries', '5',
+      '--retry-sleep', 'exp=1:120',
+      '--no-check-certificate',
+      '--sleep-interval', '1',
+      '--max-sleep-interval', '5',
+      url
+    ]);
     let stdout = '';
     let stderr = '';
 
@@ -792,8 +815,19 @@ const downloadFromUrl = (url, baseDir, importId) => {
     const tempDir = path.join(baseDir, Date.now().toString() + '-' + Math.round(Math.random() * 1e9));
     fs.mkdirSync(tempDir, { recursive: true });
 
-    // Added -P option to specify download dir and --newline for progress on new lines
-    const ytdlp = spawn('yt-dlp', ['-o', path.join(tempDir, '%(id)s.%(ext)s'), '--newline', url]);
+    // Added -P option to specify download dir and --newline for progress on new lines with anti-bot measures
+    const ytdlp = spawn('/root/.local/bin/yt-dlp', [
+      '-o', path.join(tempDir, '%(id)s.%(ext)s'),
+      '--newline',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '--extractor-retries', '5',
+      '--fragment-retries', '5',
+      '--retry-sleep', 'exp=1:120',
+      '--no-check-certificate',
+      '--sleep-interval', '1',
+      '--max-sleep-interval', '5',
+      url
+    ]);
     let stderr = '';
     let stdout = '';
 
